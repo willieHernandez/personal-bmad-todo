@@ -1,0 +1,23 @@
+{
+  "name": "todo-bmad-style",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter client dev\" \"pnpm --filter server dev\"",
+    "build": "pnpm --filter client build && pnpm --filter server build",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:e2e": "echo 'E2E tests not yet configured'"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "vitest": "^3.2.4"
+  }
+}

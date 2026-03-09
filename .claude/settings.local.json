@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:tanstack.com)",
+      "WebFetch(domain:fastify.dev)",
+      "Bash(pnpm test:unit:*)",
+      "Bash(pnpm vitest:*)"
+    ]
+  }
+}
