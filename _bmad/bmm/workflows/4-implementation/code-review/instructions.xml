@@ -229,6 +229,19 @@
       <output>ℹ️ Story status updated (no sprint tracking configured)</output>
     </check>
 
+    <!-- Pull request creation when story is done -->
+    <check if="{{new_status}} == 'done'">
+      <action>Check if current branch is a feature branch (story/{{story_key}})</action>
+      <check if="on feature branch story/{{story_key}}">
+        <action>Push the feature branch: `git push -u origin story/{{story_key}}`</action>
+        <action>Create pull request to main using: `gh pr create --title "{{story_title}}" --body "Story: {{story_key}}\n\n## Summary\n{{change_summary}}\n\nStory file: {{story_file}}"`</action>
+        <output>🔀 **Pull Request Created!** Feature branch story/{{story_key}} → main</output>
+      </check>
+      <check if="NOT on feature branch">
+        <output>⚠️ Not on a feature branch — skipping PR creation. You can manually create a PR from the story branch.</output>
+      </check>
+    </check>
+
     <output>**✅ Review Complete!**
 
       **Story Status:** {{new_status}}

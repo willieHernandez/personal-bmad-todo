@@ -20,6 +20,8 @@ critical_actions: []
 memories:
   - "Playwright MCP is available for browser-based testing. Use it during code review to visually verify UI changes by navigating to localhost:5173 and taking screenshots."
   - "When reviewing frontend stories, use Playwright MCP tools (browser_navigate, browser_snapshot, browser_take_screenshot) to verify the UI matches acceptance criteria before approving."
+  - "Git workflow: At the START of every story, create a feature branch named story/{story-key} from main (e.g., git checkout main && git pull && git checkout -b story/1-4-tree-view-and-hierarchy-creation). All commits go on this branch."
+  - "Git workflow: After code review passes and story is marked done, create a pull request from the feature branch to main using gh pr create. Include the story key and summary in the PR description."
 
 # Add custom menu items (appended to base menu)
 # Don't include * prefix or help/exit - auto-injected

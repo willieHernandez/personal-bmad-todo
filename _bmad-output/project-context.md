@@ -102,6 +102,17 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Desktop-only** — minimum 1280x720 viewport. No responsive/mobile layouts. No touch event handling.
 - **Fastify binds to `127.0.0.1`** — never `0.0.0.0`. Not network-accessible.
 
+### Git Workflow
+
+- **Feature branches per story** — when starting a new story, create a branch named `story/{story-key}` from `main` (e.g., `story/1-4-tree-view-and-hierarchy-creation`).
+- **Branch from main** — always branch from the latest `main`. Pull `main` before creating the feature branch.
+- **Commit on the feature branch** — all story implementation commits go on the feature branch, not `main`.
+- **Pull request when done** — after code review passes, submit a pull request from the feature branch back to `main`.
+- **PR title convention** — use the story title as the PR title (e.g., "Tree View and Hierarchy Creation").
+- **PR description** — include the story key, a summary of changes, and a link to the story file.
+- **Do NOT merge PRs** — the agent must only create the PR. The user will review and merge it manually.
+- **Clean up** — the user will delete the feature branch after merging.
+
 ### Critical Don't-Miss Rules
 
 - **Cascade completion is bidirectional** — completing all children auto-completes the parent. Reopening any child auto-reopens the parent. Deleting the last incomplete child auto-completes the parent. This spans DB → API → Query invalidation → UI.

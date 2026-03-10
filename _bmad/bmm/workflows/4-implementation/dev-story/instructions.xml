@@ -187,7 +187,17 @@
     </check>
   </step>
 
-  <step n="4" goal="Mark story in-progress" tag="sprint-status">
+  <step n="4" goal="Create feature branch and mark story in-progress" tag="sprint-status">
+    <!-- Git feature branch creation -->
+    <check if="this is a fresh start (NOT review_continuation)">
+      <action>Run `git checkout main && git pull origin main` to ensure latest main</action>
+      <action>Run `git checkout -b story/{{story_key}}` to create the feature branch</action>
+      <output>🌿 Created feature branch: story/{{story_key}}</output>
+    </check>
+    <check if="review_continuation == true">
+      <action>Verify current branch is story/{{story_key}}, switch to it if not</action>
+    </check>
+
     <check if="{{sprint_status}} file exists">
       <action>Load the FULL file: {{sprint_status}}</action>
       <action>Read all development_status entries to find {{story_key}}</action>
