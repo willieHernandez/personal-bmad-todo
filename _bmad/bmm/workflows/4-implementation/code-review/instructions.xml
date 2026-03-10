@@ -94,6 +94,21 @@
       5. **Test Quality**: Are tests real assertions or placeholders?
     </action>
 
+    <!-- Visual UI Verification via Playwright MCP (frontend stories) -->
+    <check if="story involves frontend or UI changes">
+      <action>Ensure dev servers are running (`pnpm dev`) or start them</action>
+      <action>Use Playwright MCP browser_navigate to open http://localhost:5173</action>
+      <action>Use browser_snapshot or browser_take_screenshot to capture current state</action>
+      <action>Verify each UI-related Acceptance Criterion visually:
+        - Layout matches spec (zones, sizing, spacing)
+        - Color palette matches UX design
+        - Interactive elements work (clicks, hover states, resize)
+        - Collapsible sections toggle correctly
+        - Typography and font usage matches spec
+      </action>
+      <action>Any visual discrepancy from AC or UX spec = finding</action>
+    </check>
+
     <check if="total_issues_found lt 3">
       <critical>NOT LOOKING HARD ENOUGH - Find more problems!</critical>
       <action>Re-examine code for:
