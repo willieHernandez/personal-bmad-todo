@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"pnpm --filter client dev\" \"pnpm --filter server dev\"",
-    "build": "pnpm --filter client build && pnpm --filter server build",
+    "build": "pnpm --filter shared build && pnpm --filter client build && pnpm --filter server build",
     "test": "vitest run",
     "test:unit": "vitest run",
     "test:e2e": "echo 'E2E tests not yet configured'"

@@ -15,6 +15,6 @@ describe('Fastify server', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: 'ok' });
+    expect(response.json()).toEqual({ status: 'ok', db: 'connected' });
   });
 });

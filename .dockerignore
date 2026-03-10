@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+**/dist
+.git
+_bmad
+_bmad-output
+docs
+**/*.md
+*.png
+*.jpg
+*.jpeg
+**/*.db
+**/*.db-wal
+**/*.db-shm
+.env
+.env.*
+!.env.example
