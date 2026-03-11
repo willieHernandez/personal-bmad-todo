@@ -20,6 +20,9 @@ const config = defineConfig({
       '/api': 'http://localhost:3001',
     },
   },
+  test: {
+    environment: 'jsdom',
+  },
 })
 
 export default config

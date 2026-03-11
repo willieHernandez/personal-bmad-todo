@@ -6,6 +6,7 @@ import {
 import { sql } from 'drizzle-orm';
 import { db } from './db/index.js';
 import nodesRoutes from './routes/nodes.route.js';
+import treeStateRoutes from './routes/tree-state.route.js';
 
 export function buildServer(opts?: { logger?: false }) {
   const server = fastify({
@@ -30,6 +31,7 @@ export function buildServer(opts?: { logger?: false }) {
   });
 
   server.register(nodesRoutes);
+  server.register(treeStateRoutes);
 
   return server;
 }

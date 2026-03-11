@@ -1,5 +1,5 @@
-import { useRef, useEffect } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { forwardRef, useRef, useEffect } from 'react'
+import { ChevronRight, Minus } from 'lucide-react'
 import { cn } from '#/lib/utils'
 import type { NodeResponse } from '@todo-bmad-style/shared'
 
@@ -18,20 +18,23 @@ interface TreeRowProps {
   style?: React.CSSProperties
 }
 
-export function TreeRow({
-  node,
-  depth,
-  isExpanded,
-  hasChildren,
-  isFocused,
-  isEditing,
-  editValue,
-  onToggleExpand,
-  onEditChange,
-  onEditCommit,
-  onEditCancel,
-  style,
-}: TreeRowProps) {
+export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow(
+  {
+    node,
+    depth,
+    isExpanded,
+    hasChildren,
+    isFocused,
+    isEditing,
+    editValue,
+    onToggleExpand,
+    onEditChange,
+    onEditCommit,
+    onEditCancel,
+    style,
+  },
+  ref
+) {
   const inputRef = useRef<HTMLInputElement>(null)
   const cancelledRef = useRef(false)
 
@@ -51,6 +54,8 @@ export function TreeRow({
       cancelledRef.current = true
       onEditCancel()
     }
+    // Stop propagation for all keys during edit mode to prevent navigation
+    e.stopPropagation()
   }
 
   const handleBlur = () => {
@@ -61,6 +66,7 @@ export function TreeRow({
 
   return (
     <div
+      ref={ref}
       role="treeitem"
       aria-expanded={hasChildren ? isExpanded : undefined}
       aria-level={depth + 1}
@@ -75,28 +81,33 @@ export function TreeRow({
       style={{
         ...style,
         paddingLeft: `${depth * 16}px`,
+        ...(isFocused ? { outline: '2px solid #3B82F6', outlineOffset: '2px' } : {}),
       }}
     >
-      {/* Chevron */}
+      {/* Chevron / Dash indicator */}
       <button
         type="button"
         className={cn(
           'flex h-4 w-4 shrink-0 items-center justify-center',
-          !hasChildren && 'invisible'
+          !hasChildren && node.type === 'subtask' && 'invisible'
         )}
         onClick={(e) => {
           e.stopPropagation()
           onToggleExpand(node.id)
         }}
         tabIndex={-1}
-        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+        aria-label={hasChildren ? (isExpanded ? 'Collapse' : 'Expand') : 'No children'}
       >
-        <ChevronRight
-          className={cn(
-            'h-4 w-4 transition-transform',
-            isExpanded && 'rotate-90'
-          )}
-        />
+        {hasChildren ? (
+          <ChevronRight
+            className={cn(
+              'h-4 w-4 transition-transform',
+              isExpanded && 'rotate-90'
+            )}
+          />
+        ) : (
+          <Minus className="h-3 w-3 text-app-text-secondary" data-testid="empty-node-dash" />
+        )}
       </button>
 
       {/* Title or Input */}
@@ -116,4 +127,4 @@ export function TreeRow({
       )}
     </div>
   )
-}
+})

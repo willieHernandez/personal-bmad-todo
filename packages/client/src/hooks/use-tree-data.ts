@@ -1,7 +1,8 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useNodeChildren } from '#/queries/node-queries'
 import { useQueries } from '@tanstack/react-query'
 import { getNodeChildren } from '#/api/nodes.api'
+import { useTreeState, useSetNodeExpanded } from '#/queries/tree-state-queries'
 import type { NodeResponse } from '@todo-bmad-style/shared'
 
 export interface FlatTreeNode {
@@ -13,20 +14,22 @@ export interface FlatTreeNode {
 
 interface UseTreeDataResult {
   visibleNodes: FlatTreeNode[]
+  expandedMap: Record<string, boolean>
   toggleExpand: (nodeId: string) => void
   isExpanded: (nodeId: string) => boolean
   setExpanded: (nodeId: string, expanded: boolean) => void
 }
 
 export function useTreeData(projectId: string | null): UseTreeDataResult {
-  const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({})
+  const { data: treeState } = useTreeState()
+  const setNodeExpandedMutation = useSetNodeExpanded()
+
+  const expandedMap = treeState ?? {}
 
   const toggleExpand = useCallback((nodeId: string) => {
-    setExpandedMap((prev) => ({
-      ...prev,
-      [nodeId]: !prev[nodeId],
-    }))
-  }, [])
+    const current = expandedMap[nodeId] ?? false
+    setNodeExpandedMutation.mutate({ nodeId, isExpanded: !current })
+  }, [expandedMap, setNodeExpandedMutation])
 
   const isExpanded = useCallback(
     (nodeId: string) => !!expandedMap[nodeId],
@@ -34,11 +37,8 @@ export function useTreeData(projectId: string | null): UseTreeDataResult {
   )
 
   const setExpanded = useCallback((nodeId: string, expanded: boolean) => {
-    setExpandedMap((prev) => ({
-      ...prev,
-      [nodeId]: expanded,
-    }))
-  }, [])
+    setNodeExpandedMutation.mutate({ nodeId, isExpanded: expanded })
+  }, [setNodeExpandedMutation])
 
   // Fetch direct children of the project (depth 0 = efforts)
   const { data: rootChildren } = useNodeChildren(projectId)
@@ -112,5 +112,5 @@ export function useTreeData(projectId: string | null): UseTreeDataResult {
     return result
   }, [rootChildren, expandedMap, childrenMap, emptyParents])
 
-  return { visibleNodes, toggleExpand, isExpanded, setExpanded }
+  return { visibleNodes, expandedMap, toggleExpand, isExpanded, setExpanded }
 }

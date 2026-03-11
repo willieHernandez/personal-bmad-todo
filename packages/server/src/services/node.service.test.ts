@@ -95,6 +95,69 @@ describe('node.service', () => {
       expect(p2.sortOrder).toBe(1);
       expect(p3.sortOrder).toBe(2);
     });
+
+    it('should insert at specified sortOrder and shift siblings down', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      await createNode({ title: 'E1', type: 'effort', parentId: project.id });
+      await createNode({ title: 'E2', type: 'effort', parentId: project.id });
+      await createNode({ title: 'E3', type: 'effort', parentId: project.id });
+
+      // Insert at position 1 (between E1 and E2)
+      const inserted = await createNode({ title: 'E-New', type: 'effort', parentId: project.id, sortOrder: 1 });
+      expect(inserted.sortOrder).toBe(1);
+
+      const children = await getChildren(project.id);
+      expect(children).toHaveLength(4);
+      expect(children[0].title).toBe('E1');
+      expect(children[0].sortOrder).toBe(0);
+      expect(children[1].title).toBe('E-New');
+      expect(children[1].sortOrder).toBe(1);
+      expect(children[2].title).toBe('E2');
+      expect(children[2].sortOrder).toBe(2);
+      expect(children[3].title).toBe('E3');
+      expect(children[3].sortOrder).toBe(3);
+    });
+
+    it('should insert at beginning when sortOrder is 0', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      await createNode({ title: 'E1', type: 'effort', parentId: project.id });
+      await createNode({ title: 'E2', type: 'effort', parentId: project.id });
+
+      const inserted = await createNode({ title: 'E-First', type: 'effort', parentId: project.id, sortOrder: 0 });
+      expect(inserted.sortOrder).toBe(0);
+
+      const children = await getChildren(project.id);
+      expect(children).toHaveLength(3);
+      expect(children[0].title).toBe('E-First');
+      expect(children[1].title).toBe('E1');
+      expect(children[2].title).toBe('E2');
+    });
+
+    it('should append to end when sortOrder exceeds sibling count', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      await createNode({ title: 'E1', type: 'effort', parentId: project.id });
+
+      const inserted = await createNode({ title: 'E-End', type: 'effort', parentId: project.id, sortOrder: 99 });
+      expect(inserted.sortOrder).toBe(99);
+
+      const children = await getChildren(project.id);
+      expect(children).toHaveLength(2);
+      expect(children[0].title).toBe('E1');
+      expect(children[1].title).toBe('E-End');
+    });
+
+    it('should append to end when sortOrder is omitted', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      await createNode({ title: 'E1', type: 'effort', parentId: project.id });
+      await createNode({ title: 'E2', type: 'effort', parentId: project.id });
+
+      // No sortOrder — should append
+      const appended = await createNode({ title: 'E-Last', type: 'effort', parentId: project.id });
+      expect(appended.sortOrder).toBe(2);
+
+      const children = await getChildren(project.id);
+      expect(children[2].title).toBe('E-Last');
+    });
   });
 
   describe('getProjects', () => {

@@ -1,8 +1,9 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Plus } from 'lucide-react'
 import { useTreeData } from '#/hooks/use-tree-data'
 import { useTreeOperations } from '#/hooks/use-tree-operations'
+import { useTreeNavigation } from '#/hooks/use-tree-navigation'
 import { useUIStore } from '#/stores/ui-store'
 import { updateNode, deleteNode } from '#/api/nodes.api'
 import { useQueryClient } from '@tanstack/react-query'
@@ -14,18 +15,67 @@ interface TreeViewProps {
 
 export function TreeView({ projectId }: TreeViewProps) {
   const parentRef = useRef<HTMLDivElement>(null)
+  const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const pendingFocusNodeId = useRef<string | null>(null)
   const queryClient = useQueryClient()
 
-  const { visibleNodes, toggleExpand, setExpanded } = useTreeData(projectId)
+  const { visibleNodes, expandedMap, toggleExpand, setExpanded } = useTreeData(projectId)
   const { createChild, createSibling, indentNode, outdentNode } = useTreeOperations()
 
-  const focusedNodeId = useUIStore((s) => s.activeNodeId)
   const setFocusedNode = useUIStore((s) => s.setFocusedNode)
 
   // Editing state
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [isNewNode, setIsNewNode] = useState(false)
+
+  // Keyboard navigation
+  const { focusedIndex, setFocusedIndex, handleKeyDown: navHandleKeyDown } = useTreeNavigation({
+    visibleNodes,
+    expandedMap,
+    setExpanded,
+  })
+
+  // Resolve pending focus after visibleNodes updates (e.g., after indent/outdent)
+  useEffect(() => {
+    if (pendingFocusNodeId.current) {
+      const newIndex = visibleNodes.findIndex((n) => n.node.id === pendingFocusNodeId.current)
+      if (newIndex >= 0) {
+        setFocusedIndex(newIndex)
+        pendingFocusNodeId.current = null
+      }
+    }
+  }, [visibleNodes, setFocusedIndex])
+
+  // Sync focusedIndex → activeNodeId in Zustand store
+  useEffect(() => {
+    const node = visibleNodes[focusedIndex]
+    if (node) {
+      setFocusedNode(node.node.id)
+    }
+  }, [focusedIndex, visibleNodes, setFocusedNode])
+
+  // Scroll focused row into view
+  const virtualizer = useVirtualizer({
+    count: visibleNodes.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 28,
+    overscan: 10,
+  })
+
+  useEffect(() => {
+    if (focusedIndex >= 0 && focusedIndex < visibleNodes.length && virtualizer.scrollToIndex) {
+      virtualizer.scrollToIndex(focusedIndex, { align: 'auto' })
+    }
+  }, [focusedIndex, visibleNodes.length, virtualizer])
+
+  // Focus the DOM element when focusedIndex changes
+  useEffect(() => {
+    const el = rowRefs.current.get(focusedIndex)
+    if (el && !editingNodeId) {
+      el.focus()
+    }
+  }, [focusedIndex, editingNodeId])
 
   const clearEditing = useCallback(() => {
     setEditingNodeId(null)
@@ -37,10 +87,8 @@ export function TreeView({ projectId }: TreeViewProps) {
     async (nodeId: string) => {
       const trimmed = editValue.trim()
       if (!trimmed && isNewNode) {
-        // Delete the empty new node
         try {
           await deleteNode(nodeId)
-          // Find the node to get its parentId for cache invalidation
           const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
           if (flatNode?.node.parentId) {
             queryClient.invalidateQueries({
@@ -77,10 +125,16 @@ export function TreeView({ projectId }: TreeViewProps) {
       const target = e.target as HTMLElement
       const nodeId = target.getAttribute('data-node-id')
 
+      // When in edit mode, don't handle navigation keys
+      if (editingNodeId) return
+
       // Handle Tab/Shift+Tab for indent/outdent
       if (e.key === 'Tab') {
         e.preventDefault()
         if (!nodeId) return
+
+        // Schedule focus restoration for after the tree re-renders
+        pendingFocusNodeId.current = nodeId
 
         if (e.shiftKey) {
           await outdentNode(nodeId, visibleNodes)
@@ -94,14 +148,13 @@ export function TreeView({ projectId }: TreeViewProps) {
       }
 
       // Handle Enter for creating siblings
-      if (e.key === 'Enter' && !editingNodeId) {
+      if (e.key === 'Enter') {
         e.preventDefault()
         if (!nodeId) return
 
         const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
         if (!flatNode) return
 
-        // Expand the parent so the sibling is visible
         const result = await createSibling(flatNode.node, visibleNodes)
         if (result) {
           setFocusedNode(result.id)
@@ -111,6 +164,9 @@ export function TreeView({ projectId }: TreeViewProps) {
         }
         return
       }
+
+      // Delegate arrow/home/end keys to navigation hook
+      navHandleKeyDown(e)
     },
     [
       editingNodeId,
@@ -120,25 +176,20 @@ export function TreeView({ projectId }: TreeViewProps) {
       outdentNode,
       setFocusedNode,
       setExpanded,
+      navHandleKeyDown,
     ]
   )
 
   const handleNodeClick = useCallback(
-    (nodeId: string) => {
+    (nodeId: string, index: number) => {
       if (editingNodeId && editingNodeId !== nodeId) {
         handleEditCommit(editingNodeId)
       }
+      setFocusedIndex(index)
       setFocusedNode(nodeId)
     },
-    [editingNodeId, handleEditCommit, setFocusedNode]
+    [editingNodeId, handleEditCommit, setFocusedNode, setFocusedIndex]
   )
-
-  const virtualizer = useVirtualizer({
-    count: visibleNodes.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 28,
-    overscan: 10,
-  })
 
   const handleCreateFirstEffort = useCallback(async () => {
     const result = await createChild(projectId, 'effort')
@@ -193,14 +244,21 @@ export function TreeView({ projectId }: TreeViewProps) {
                 height: `${virtualRow.size}px`,
                 width: '100%',
               }}
-              onClick={() => handleNodeClick(flatNode.node.id)}
+              onClick={() => handleNodeClick(flatNode.node.id, virtualRow.index)}
             >
               <TreeRow
+                ref={(el) => {
+                  if (el) {
+                    rowRefs.current.set(virtualRow.index, el)
+                  } else {
+                    rowRefs.current.delete(virtualRow.index)
+                  }
+                }}
                 node={flatNode.node}
                 depth={flatNode.depth}
                 isExpanded={flatNode.isExpanded}
                 hasChildren={flatNode.hasChildren}
-                isFocused={focusedNodeId === flatNode.node.id}
+                isFocused={focusedIndex === virtualRow.index}
                 isEditing={editingNodeId === flatNode.node.id}
                 editValue={editingNodeId === flatNode.node.id ? editValue : ''}
                 onToggleExpand={toggleExpand}
@@ -225,7 +283,6 @@ export function TreeView({ projectId }: TreeViewProps) {
                         })
                       }
                     } catch {
-                      // If delete fails, invalidate to sync with server state
                       queryClient.invalidateQueries({
                         queryKey: ['nodes'],
                       })

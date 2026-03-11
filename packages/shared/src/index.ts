@@ -10,6 +10,10 @@ export {
   reorderNodeSchema,
   nodeResponseSchema,
 } from './schemas/node.schema.js';
+export {
+  treeStateSchema,
+  bulkTreeStateSchema,
+} from './schemas/tree-state.schema.js';
 
 // Types
 export type {

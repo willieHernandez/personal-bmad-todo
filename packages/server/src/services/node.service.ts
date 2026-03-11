@@ -87,17 +87,40 @@ export async function createNode(data: CreateNode) {
     validateHierarchy(data.type, parent.type);
   }
 
-  // Compute sort_order: max among siblings + 1
   const parentCondition = data.parentId
     ? eq(nodes.parentId, data.parentId)
     : isNull(nodes.parentId);
 
-  const maxResult = await db
-    .select({ maxOrder: max(nodes.sortOrder) })
-    .from(nodes)
-    .where(parentCondition);
+  let sortOrder: number;
 
-  const sortOrder = (maxResult[0]?.maxOrder ?? -1) + 1;
+  if (data.sortOrder !== undefined) {
+    // Insert at requested position — shift siblings at or after this position
+    sortOrder = data.sortOrder;
+
+    const siblings = await db
+      .select()
+      .from(nodes)
+      .where(parentCondition)
+      .orderBy(asc(nodes.sortOrder));
+
+    // Shift siblings at or after the insertion point
+    for (const sibling of siblings) {
+      if (sibling.sortOrder >= sortOrder) {
+        await db
+          .update(nodes)
+          .set({ sortOrder: sibling.sortOrder + 1 })
+          .where(eq(nodes.id, sibling.id));
+      }
+    }
+  } else {
+    // Append to end (default)
+    const maxResult = await db
+      .select({ maxOrder: max(nodes.sortOrder) })
+      .from(nodes)
+      .where(parentCondition);
+
+    sortOrder = (maxResult[0]?.maxOrder ?? -1) + 1;
+  }
 
   const newNode = {
     id,
