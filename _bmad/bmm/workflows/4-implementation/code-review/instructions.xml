@@ -109,6 +109,17 @@
       <action>Any visual discrepancy from AC or UX spec = finding</action>
     </check>
 
+    <!-- API Verification via Postman MCP (backend stories) -->
+    <check if="story involves API endpoints or backend changes">
+      <action>Use Postman MCP to validate API endpoint contracts and integration behavior</action>
+      <action>Test request/response shapes against shared Zod schemas</action>
+      <action>Verify error handling responses (400, 404, 500)</action>
+      <action>Any API contract violation or missing error handling = finding</action>
+    </check>
+
+    <!-- Chrome DevTools MCP for debugging during review -->
+    <action>Chrome DevTools MCP is available for runtime debugging, console inspection, network request analysis, and performance profiling during review. Use it to investigate suspicious behavior or verify performance targets.</action>
+
     <check if="total_issues_found lt 3">
       <critical>NOT LOOKING HARD ENOUGH - Find more problems!</critical>
       <action>Re-examine code for:

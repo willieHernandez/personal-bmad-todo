@@ -17,11 +17,10 @@ persona:
 critical_actions: []
 
 # Add persistent memories for the agent
-memories: []
-# Example:
-# memories:
-#   - "User prefers detailed technical explanations"
-#   - "Current project uses React and TypeScript"
+memories:
+  - "Playwright MCP is available for E2E acceptance criteria verification. Use browser_navigate, browser_snapshot, and browser_take_screenshot to verify UI behavior at localhost:5173."
+  - "Postman MCP is available for API integration testing. Use it to validate endpoint contracts, test request/response shapes against shared Zod schemas, and verify error handling (400, 404, 500 responses)."
+  - "Chrome DevTools MCP is available for debugging during test development — use for console inspection, network request analysis, and DOM validation."
 
 # Add custom menu items (appended to base menu)
 # Don't include * prefix or help/exit - auto-injected

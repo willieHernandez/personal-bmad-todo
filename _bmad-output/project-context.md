@@ -113,6 +113,12 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Do NOT merge PRs** — the agent must only create the PR. The user will review and merge it manually.
 - **Clean up** — the user will delete the feature branch after merging.
 
+### MCP Tools Available
+
+- **Playwright MCP** — Use for verifying acceptance criteria on UI/frontend stories. Navigate to `http://localhost:5173`, take screenshots, and validate visual/interactive behavior. Use at the **end of dev-story workflow** (after all tasks complete, before marking for review) AND during **code review**.
+- **Postman MCP** — Use for API integration testing. Validate API endpoints, request/response contracts, and error handling during development and QA workflows.
+- **Chrome DevTools MCP** — Use during **development** and **code review** for runtime debugging, performance profiling, console inspection, and DOM analysis. Available for implementation troubleshooting and review verification.
+
 ### Critical Don't-Miss Rules
 
 - **Cascade completion is bidirectional** — completing all children auto-completes the parent. Reopening any child auto-reopens the parent. Deleting the last incomplete child auto-completes the parent. This spans DB → API → Query invalidation → UI.

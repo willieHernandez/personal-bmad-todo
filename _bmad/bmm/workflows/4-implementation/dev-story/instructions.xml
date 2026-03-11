@@ -128,7 +128,7 @@
     <action>Identify first incomplete task (unchecked [ ]) in Tasks/Subtasks</action>
 
     <action if="no incomplete tasks">
-      <goto step="6">Completion sequence</goto>
+      <goto step="9">AC verification with MCP tools</goto>
     </action>
     <action if="story file inaccessible">HALT: "Cannot develop story without access to story file"</action>
     <action if="incomplete task or subtask requirements ambiguous">ASK user to clarify or HALT</action>
@@ -237,6 +237,9 @@
     <action>Review the current task/subtask from the story file - this is your authoritative implementation guide</action>
     <action>Plan implementation following red-green-refactor cycle</action>
 
+    <!-- Use Chrome DevTools MCP for debugging during implementation -->
+    <action>Chrome DevTools MCP is available for runtime debugging, DOM inspection, console monitoring, and performance profiling during implementation. Use it when troubleshooting issues.</action>
+
     <!-- RED PHASE -->
     <action>Write FAILING tests first for the task/subtask functionality</action>
     <action>Confirm tests fail before implementation - this validates test correctness</action>
@@ -326,11 +329,41 @@
       <goto step="5">Next task</goto>
     </action>
     <action if="no tasks remain">
-      <goto step="9">Completion</goto>
+      <goto step="9">AC verification with MCP tools</goto>
     </action>
   </step>
 
-  <step n="9" goal="Story completion and mark for review" tag="sprint-status">
+  <step n="9" goal="Verify acceptance criteria with MCP tools">
+    <critical>Before marking story for review, verify ALL acceptance criteria using available MCP tools</critical>
+
+    <!-- UI/Frontend AC Verification via Playwright MCP -->
+    <check if="story involves frontend or UI changes">
+      <action>Ensure dev servers are running (`pnpm dev`) or start them</action>
+      <action>Use Playwright MCP browser_navigate to open http://localhost:5173</action>
+      <action>Use browser_snapshot or browser_take_screenshot to capture current state</action>
+      <action>Verify EACH UI-related Acceptance Criterion visually:
+        - Layout matches spec (zones, sizing, spacing)
+        - Interactive elements work (clicks, hover states, resize)
+        - Collapsible sections toggle correctly
+        - Typography, colors, and styling match spec
+        - Keyboard navigation works as specified
+      </action>
+      <action>If any visual AC fails, go back and fix before proceeding</action>
+    </check>
+
+    <!-- API AC Verification via Postman MCP -->
+    <check if="story involves API endpoints or backend changes">
+      <action>Use Postman MCP to validate API endpoint contracts</action>
+      <action>Verify request/response shapes match shared Zod schemas</action>
+      <action>Test error handling (400, 404, 500 responses)</action>
+      <action>If any API AC fails, go back and fix before proceeding</action>
+    </check>
+
+    <action>Document MCP verification results in Dev Agent Record → Completion Notes</action>
+    <action if="any AC verification fails">HALT - Fix AC failures before marking for review</action>
+  </step>
+
+  <step n="10" goal="Story completion and mark for review" tag="sprint-status">
     <action>Verify ALL tasks and subtasks are marked [x] (re-scan the story document now)</action>
     <action>Run the full regression suite (do not skip)</action>
     <action>Confirm File List includes every changed file</action>
@@ -380,7 +413,7 @@
     <action if="definition-of-done validation fails">HALT - Address DoD failures before completing</action>
   </step>
 
-  <step n="10" goal="Completion communication and user support">
+  <step n="11" goal="Completion communication and user support">
     <action>Execute the enhanced definition-of-done checklist using the validation framework</action>
     <action>Prepare a concise summary in Dev Agent Record → Completion Notes</action>
 

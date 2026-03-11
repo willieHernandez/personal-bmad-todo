@@ -34,6 +34,7 @@ For API endpoints/services, generate tests that:
 - Validate response structure
 - Cover happy path + 1-2 error cases
 - Use project's existing test framework patterns
+- **Use Postman MCP** to interactively validate API endpoint contracts and integration behavior before writing test assertions. This helps verify expected responses and error handling.
 
 ### Step 3: Generate E2E Tests (if UI exists)
 

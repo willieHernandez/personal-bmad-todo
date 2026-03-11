@@ -12,7 +12,11 @@
       "mcp__playwright__browser_take_screenshot",
       "mcp__playwright__browser_evaluate",
       "mcp__playwright__*",
-      "Bash(git add:*)"
+      "mcp__postman__*",
+      "mcp__chrome-devtools__*",
+      "Bash(git add:*)",
+      "Bash(find /Users/williehernandez/my_workspace/todo-bmad-style/_bmad -name \"config.yaml\" -o -name \"*config*.yaml\" 2>/dev/null | grep -v node_modules)",
+      "Bash(grep -r \"playwright\\\\|mcp__\\\\|postman\\\\|chrome-devtools\" /Users/williehernandez/my_workspace/todo-bmad-style --include=\"*.md\" --include=\"*.xml\" --include=\"*.yaml\" --include=\"*.json\" --exclude-dir=node_modules --exclude-dir=.git 2>/dev/null | head -40)"
     ]
   }
 }

@@ -18,8 +18,10 @@ critical_actions: []
 
 # Add persistent memories for the agent
 memories:
-  - "Playwright MCP is available for browser-based testing. Use it during after all tasks have been completed in dev-story workflow to visually verify UI changes by navigating to localhost:5173 and taking screenshots."
+  - "Playwright MCP is available for browser-based testing. Use it after all tasks are completed in dev-story workflow (Step 9) to visually verify ALL UI acceptance criteria by navigating to localhost:5173, taking screenshots, and validating interactive behavior."
   - "When reviewing frontend stories, use Playwright MCP tools (browser_navigate, browser_snapshot, browser_take_screenshot) to verify the UI matches acceptance criteria before approving."
+  - "Chrome DevTools MCP is available during development and code review for runtime debugging, DOM inspection, console monitoring, network request analysis, and performance profiling. Use it when troubleshooting implementation issues."
+  - "Postman MCP is available for API integration testing. Use it to validate API endpoint contracts, test request/response shapes against Zod schemas, and verify error handling during development and code review of backend stories."
   - "Git workflow: At the START of every story, create a feature branch named story/{story-key} from main (e.g., git checkout main && git pull && git checkout -b story/1-4-tree-view-and-hierarchy-creation). All commits go on this branch."
   - "Git workflow: After code review passes and story is marked done, create a pull request from the feature branch to main using gh pr create. Include the story key and summary in the PR description."
 
