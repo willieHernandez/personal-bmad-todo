@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createElement } from 'react'
@@ -74,6 +74,16 @@ vi.mock('#/api/nodes.api', () => ({
   }),
 }))
 
+let mockTreeState: Record<string, boolean> = {}
+const mockMutate = vi.fn((args: { nodeId: string; isExpanded: boolean }) => {
+  mockTreeState = { ...mockTreeState, [args.nodeId]: args.isExpanded }
+})
+
+vi.mock('#/queries/tree-state-queries', () => ({
+  useTreeState: vi.fn(() => ({ data: mockTreeState })),
+  useSetNodeExpanded: vi.fn(() => ({ mutate: mockMutate })),
+}))
+
 import { useTreeData } from './use-tree-data'
 
 function createWrapper() {
@@ -85,6 +95,11 @@ function createWrapper() {
 }
 
 describe('useTreeData', () => {
+  beforeEach(() => {
+    mockTreeState = {}
+    mockMutate.mockClear()
+  })
+
   it('returns flat list of root children at depth 0', () => {
     const { result } = renderHook(() => useTreeData('proj-1'), {
       wrapper: createWrapper(),
@@ -106,7 +121,7 @@ describe('useTreeData', () => {
     expect(result.current.visibleNodes[0].hasChildren).toBe(true)
   })
 
-  it('toggleExpand flips expansion state', () => {
+  it('toggleExpand calls mutation with toggled value', () => {
     const { result } = renderHook(() => useTreeData('proj-1'), {
       wrapper: createWrapper(),
     })
@@ -117,13 +132,7 @@ describe('useTreeData', () => {
       result.current.toggleExpand('e1')
     })
 
-    expect(result.current.isExpanded('e1')).toBe(true)
-
-    act(() => {
-      result.current.toggleExpand('e1')
-    })
-
-    expect(result.current.isExpanded('e1')).toBe(false)
+    expect(mockMutate).toHaveBeenCalledWith({ nodeId: 'e1', isExpanded: true })
   })
 
   it('returns empty array when projectId is null', () => {
@@ -135,18 +144,24 @@ describe('useTreeData', () => {
   })
 
   it('shows expanded children in flat list when node is expanded', () => {
+    mockTreeState = { e1: true }
+
     const { result } = renderHook(() => useTreeData('proj-1'), {
       wrapper: createWrapper(),
     })
 
-    act(() => {
-      result.current.toggleExpand('e1')
+    // e1 should be expanded, and its children (from useQueries mock) should appear
+    const e1Node = result.current.visibleNodes.find((n) => n.node.id === 'e1')
+    expect(e1Node?.isExpanded).toBe(true)
+  })
+
+  it('exposes expandedMap from API state', () => {
+    mockTreeState = { e1: true, e2: false }
+
+    const { result } = renderHook(() => useTreeData('proj-1'), {
+      wrapper: createWrapper(),
     })
 
-    // After expanding e1, tasks under e1 should appear
-    const nodes = result.current.visibleNodes
-    // e1 should be expanded, and its children (from useQueries mock) should appear
-    const e1Node = nodes.find((n) => n.node.id === 'e1')
-    expect(e1Node?.isExpanded).toBe(true)
+    expect(result.current.expandedMap).toEqual({ e1: true, e2: false })
   })
 })

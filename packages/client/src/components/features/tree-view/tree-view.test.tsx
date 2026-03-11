@@ -46,6 +46,7 @@ const mockToggleExpand = vi.fn()
 vi.mock('#/hooks/use-tree-data', () => ({
   useTreeData: () => ({
     visibleNodes: mockVisibleNodes,
+    expandedMap: {},
     toggleExpand: mockToggleExpand,
     isExpanded: () => false,
     setExpanded: vi.fn(),

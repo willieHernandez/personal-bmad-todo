@@ -63,10 +63,10 @@ describe('TreeRow', () => {
     expect(row?.getAttribute('style')).toContain('padding-left: 32px')
   })
 
-  it('hides chevron when node has no children', () => {
+  it('hides chevron for subtask nodes with no children', () => {
     const { container } = render(
       <TreeRow
-        node={makeNode()}
+        node={makeNode({ type: 'subtask' })}
         depth={0}
         isExpanded={false}
         hasChildren={false}
@@ -78,6 +78,23 @@ describe('TreeRow', () => {
     )
     const chevronBtn = container.querySelector('button')
     expect(chevronBtn?.className).toContain('invisible')
+  })
+
+  it('shows dash icon for expandable nodes with no children', () => {
+    render(
+      <TreeRow
+        node={makeNode({ type: 'effort' })}
+        depth={0}
+        isExpanded={false}
+        hasChildren={false}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        {...defaultProps}
+      />
+    )
+    const dash = screen.getByTestId('empty-node-dash')
+    expect(dash).toBeDefined()
   })
 
   it('shows chevron when node has children', () => {

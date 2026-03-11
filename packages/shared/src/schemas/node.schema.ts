@@ -5,6 +5,7 @@ export const createNodeSchema = z.object({
   title: z.string().min(1),
   type: z.enum([NodeType.PROJECT, NodeType.EFFORT, NodeType.TASK, NodeType.SUBTASK]),
   parentId: z.string().uuid().nullable().optional(),
+  sortOrder: z.number().int().min(0).optional(),
 });
 
 export const updateNodeSchema = z.object({
