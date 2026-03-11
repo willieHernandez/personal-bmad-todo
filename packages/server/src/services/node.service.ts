@@ -192,20 +192,25 @@ export async function reorderNode(id: string, newSortOrder: number) {
   return { ...node, sortOrder: insertAt, updatedAt: now };
 }
 
-export async function moveNode(id: string, newParentId: string, sortOrder: number) {
+export async function moveNode(id: string, newParentId: string, sortOrder: number, newType?: string) {
   const node = await getNodeById(id);
   const newParent = await getNodeById(newParentId);
-  validateHierarchy(node.type, newParent.type);
+  const effectiveType = newType ?? node.type;
+  validateHierarchy(effectiveType, newParent.type);
 
   const oldParentId = node.parentId;
   const now = new Date().toISOString();
 
   db.run(sql`BEGIN IMMEDIATE`);
   try {
-    // Update node's parent and sort order
+    // Update node's parent, sort order, and optionally type
+    const updateFields: Record<string, unknown> = { parentId: newParentId, sortOrder, updatedAt: now };
+    if (newType) {
+      updateFields.type = newType;
+    }
     await db
       .update(nodes)
-      .set({ parentId: newParentId, sortOrder, updatedAt: now })
+      .set(updateFields)
       .where(eq(nodes.id, id));
 
     // Re-index old parent's children to close gaps
