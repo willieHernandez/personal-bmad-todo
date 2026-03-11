@@ -5,9 +5,40 @@ import { useTreeData } from '#/hooks/use-tree-data'
 import { useTreeOperations } from '#/hooks/use-tree-operations'
 import { useTreeNavigation } from '#/hooks/use-tree-navigation'
 import { useUIStore } from '#/stores/ui-store'
-import { updateNode, deleteNode } from '#/api/nodes.api'
-import { useQueryClient } from '@tanstack/react-query'
+import { useUpdateNode, useDeleteNode } from '#/queries/node-queries'
 import { TreeRow } from './tree-row'
+import type { FlatTreeNode } from '#/hooks/use-tree-data'
+
+export function getDeleteFocusTarget(
+  visibleNodes: FlatTreeNode[],
+  deletedNodeId: string
+): string | null {
+  const idx = visibleNodes.findIndex((n) => n.node.id === deletedNodeId)
+  if (idx < 0) return null
+
+  const node = visibleNodes[idx]
+  const parentId = node.node.parentId
+
+  // 1. Next sibling (same parent)
+  for (let i = idx + 1; i < visibleNodes.length; i++) {
+    if (visibleNodes[i].node.parentId === parentId) return visibleNodes[i].node.id
+    if (visibleNodes[i].depth <= node.depth) break
+  }
+
+  // 2. Previous sibling (same parent)
+  for (let i = idx - 1; i >= 0; i--) {
+    if (visibleNodes[i].node.parentId === parentId) return visibleNodes[i].node.id
+    if (visibleNodes[i].depth < node.depth) break
+  }
+
+  // 3. Parent
+  if (parentId) {
+    const parentNode = visibleNodes.find((n) => n.node.id === parentId)
+    if (parentNode) return parentNode.node.id
+  }
+
+  return null
+}
 
 interface TreeViewProps {
   projectId: string
@@ -17,10 +48,11 @@ export function TreeView({ projectId }: TreeViewProps) {
   const parentRef = useRef<HTMLDivElement>(null)
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const pendingFocusNodeId = useRef<string | null>(null)
-  const queryClient = useQueryClient()
 
   const { visibleNodes, expandedMap, toggleExpand, setExpanded } = useTreeData(projectId)
   const { createChild, createSibling, indentNode, outdentNode } = useTreeOperations()
+  const updateNodeMutation = useUpdateNode()
+  const deleteNodeMutation = useDeleteNode()
 
   const setFocusedNode = useUIStore((s) => s.setFocusedNode)
 
@@ -36,16 +68,25 @@ export function TreeView({ projectId }: TreeViewProps) {
     setExpanded,
   })
 
-  // Resolve pending focus after visibleNodes updates (e.g., after indent/outdent)
+  // Resolve pending focus after visibleNodes updates (e.g., after indent/outdent/delete)
   useEffect(() => {
     if (pendingFocusNodeId.current) {
       const newIndex = visibleNodes.findIndex((n) => n.node.id === pendingFocusNodeId.current)
       if (newIndex >= 0) {
+        // Force DOM re-focus even if focusedIndex value is the same (e.g., delete at index 0,
+        // next sibling now at index 0 — setFocusedIndex(0) is a no-op but we still need to
+        // focus the new DOM element)
+        if (newIndex === focusedIndex) {
+          const el = rowRefs.current.get(newIndex)
+          if (el && !editingNodeId) {
+            el.focus()
+          }
+        }
         setFocusedIndex(newIndex)
         pendingFocusNodeId.current = null
       }
     }
-  }, [visibleNodes, setFocusedIndex])
+  }, [visibleNodes, setFocusedIndex, focusedIndex, editingNodeId])
 
   // Sync focusedIndex → activeNodeId in Zustand store
   useEffect(() => {
@@ -84,46 +125,49 @@ export function TreeView({ projectId }: TreeViewProps) {
   }, [])
 
   const handleEditCommit = useCallback(
-    async (nodeId: string) => {
+    (nodeId: string) => {
       const trimmed = editValue.trim()
+      const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
+
       if (!trimmed && isNewNode) {
-        try {
-          await deleteNode(nodeId)
-          const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
-          if (flatNode?.node.parentId) {
-            queryClient.invalidateQueries({
-              queryKey: ['nodes', flatNode.node.parentId, 'children'],
-            })
-          }
-        } catch {
-          // ignore deletion errors
+        // Empty name on new node creation — delete the placeholder via mutation
+        if (flatNode) {
+          deleteNodeMutation.mutate({
+            id: nodeId,
+            parentId: flatNode.node.parentId,
+          })
         }
         clearEditing()
         return
       }
 
-      if (trimmed) {
-        try {
-          await updateNode(nodeId, { title: trimmed })
-          const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
-          if (flatNode?.node.parentId) {
-            queryClient.invalidateQueries({
-              queryKey: ['nodes', flatNode.node.parentId, 'children'],
-            })
-          }
-        } catch {
-          // revert on error
-        }
+      if (!trimmed && !isNewNode) {
+        // Empty name on rename — cancel (restore original title)
+        clearEditing()
+        return
+      }
+
+      if (flatNode && trimmed !== flatNode.node.title) {
+        // Both rename and new node creation use the optimistic update mutation
+        updateNodeMutation.mutate({
+          id: nodeId,
+          data: { title: trimmed },
+          parentId: flatNode.node.parentId,
+        })
       }
       clearEditing()
     },
-    [editValue, isNewNode, visibleNodes, queryClient, clearEditing]
+    [editValue, isNewNode, visibleNodes, clearEditing, updateNodeMutation, deleteNodeMutation]
   )
 
   const handleKeyDown = useCallback(
     async (e: React.KeyboardEvent) => {
       const target = e.target as HTMLElement
+      // Fall back to the currently focused node when e.target is the tree container
+      // (happens after delete removes the focused DOM element)
       const nodeId = target.getAttribute('data-node-id')
+        ?? visibleNodes[focusedIndex]?.node.id
+        ?? null
 
       // When in edit mode, don't handle navigation keys
       if (editingNodeId) return
@@ -147,8 +191,8 @@ export function TreeView({ projectId }: TreeViewProps) {
         return
       }
 
-      // Handle Enter for creating siblings
-      if (e.key === 'Enter') {
+      // Handle Ctrl+Enter for creating siblings (previously just Enter)
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
         if (!nodeId) return
 
@@ -165,11 +209,51 @@ export function TreeView({ projectId }: TreeViewProps) {
         return
       }
 
+      // Handle Enter for rename mode on existing nodes
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        if (!nodeId) return
+
+        const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
+        if (!flatNode) return
+
+        // Enter on existing node = rename mode
+        setEditingNodeId(nodeId)
+        setEditValue(flatNode.node.title)
+        setIsNewNode(false)
+        return
+      }
+
+      // Handle Delete/Backspace for node deletion (not during edit mode)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault()
+        if (!nodeId) return
+
+        const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
+        if (!flatNode) return
+
+        // Compute focus target before deletion
+        const focusTargetId = getDeleteFocusTarget(visibleNodes, nodeId)
+
+        // Set pending focus for after re-render
+        if (focusTargetId) {
+          pendingFocusNodeId.current = focusTargetId
+        }
+
+        // Optimistic delete
+        deleteNodeMutation.mutate({
+          id: nodeId,
+          parentId: flatNode.node.parentId,
+        })
+        return
+      }
+
       // Delegate arrow/home/end keys to navigation hook
       navHandleKeyDown(e)
     },
     [
       editingNodeId,
+      focusedIndex,
       visibleNodes,
       createSibling,
       indentNode,
@@ -177,6 +261,7 @@ export function TreeView({ projectId }: TreeViewProps) {
       setFocusedNode,
       setExpanded,
       navHandleKeyDown,
+      deleteNodeMutation,
     ]
   )
 
@@ -189,6 +274,36 @@ export function TreeView({ projectId }: TreeViewProps) {
       setFocusedNode(nodeId)
     },
     [editingNodeId, handleEditCommit, setFocusedNode, setFocusedIndex]
+  )
+
+  const handleNodeDoubleClick = useCallback(
+    (nodeId: string) => {
+      if (editingNodeId) return
+      const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
+      if (!flatNode) return
+      setEditingNodeId(nodeId)
+      setEditValue(flatNode.node.title)
+      setIsNewNode(false)
+    },
+    [editingNodeId, visibleNodes]
+  )
+
+  const handleNodeDelete = useCallback(
+    (nodeId: string) => {
+      const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
+      if (!flatNode) return
+
+      const focusTargetId = getDeleteFocusTarget(visibleNodes, nodeId)
+      if (focusTargetId) {
+        pendingFocusNodeId.current = focusTargetId
+      }
+
+      deleteNodeMutation.mutate({
+        id: nodeId,
+        parentId: flatNode.node.parentId,
+      })
+    },
+    [visibleNodes, deleteNodeMutation]
   )
 
   const handleCreateFirstEffort = useCallback(async () => {
@@ -260,34 +375,29 @@ export function TreeView({ projectId }: TreeViewProps) {
                 hasChildren={flatNode.hasChildren}
                 isFocused={focusedIndex === virtualRow.index}
                 isEditing={editingNodeId === flatNode.node.id}
+                isRenaming={editingNodeId === flatNode.node.id && !isNewNode}
                 editValue={editingNodeId === flatNode.node.id ? editValue : ''}
                 onToggleExpand={toggleExpand}
                 onEditChange={setEditValue}
+                onDoubleClick={() => handleNodeDoubleClick(flatNode.node.id)}
+                onDelete={() => handleNodeDelete(flatNode.node.id)}
                 onEditCommit={() =>
                   editingNodeId && handleEditCommit(editingNodeId)
                 }
-                onEditCancel={async () => {
+                onEditCancel={() => {
                   if (isNewNode && editingNodeId) {
-                    try {
-                      await deleteNode(editingNodeId)
-                      const flatN = visibleNodes.find(
-                        (n) => n.node.id === editingNodeId
-                      )
-                      if (flatN?.node.parentId) {
-                        queryClient.invalidateQueries({
-                          queryKey: [
-                            'nodes',
-                            flatN.node.parentId,
-                            'children',
-                          ],
-                        })
-                      }
-                    } catch {
-                      queryClient.invalidateQueries({
-                        queryKey: ['nodes'],
+                    // New node creation cancelled — delete the placeholder via mutation
+                    const flatN = visibleNodes.find(
+                      (n) => n.node.id === editingNodeId
+                    )
+                    if (flatN) {
+                      deleteNodeMutation.mutate({
+                        id: editingNodeId,
+                        parentId: flatN.node.parentId,
                       })
                     }
                   }
+                  // For rename (isNewNode === false): just clear editing state, original title restored
                   clearEditing()
                 }}
               />

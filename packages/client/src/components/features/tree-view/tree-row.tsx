@@ -1,5 +1,5 @@
 import { forwardRef, useRef, useEffect } from 'react'
-import { ChevronRight, Minus } from 'lucide-react'
+import { ChevronRight, Minus, Trash2 } from 'lucide-react'
 import { cn } from '#/lib/utils'
 import type { NodeResponse } from '@todo-bmad-style/shared'
 
@@ -10,11 +10,14 @@ interface TreeRowProps {
   hasChildren: boolean
   isFocused: boolean
   isEditing: boolean
+  isRenaming?: boolean
   editValue: string
   onToggleExpand: (nodeId: string) => void
   onEditChange: (value: string) => void
   onEditCommit: () => void
   onEditCancel: () => void
+  onDoubleClick?: () => void
+  onDelete?: () => void
   style?: React.CSSProperties
 }
 
@@ -26,11 +29,14 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
     hasChildren,
     isFocused,
     isEditing,
+    isRenaming,
     editValue,
     onToggleExpand,
     onEditChange,
     onEditCommit,
     onEditCancel,
+    onDoubleClick,
+    onDelete,
     style,
   },
   ref
@@ -42,8 +48,11 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
     if (isEditing && inputRef.current) {
       cancelledRef.current = false
       inputRef.current.focus()
+      if (isRenaming) {
+        inputRef.current.select()
+      }
     }
-  }, [isEditing])
+  }, [isEditing, isRenaming])
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -73,8 +82,9 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
       aria-selected={isFocused}
       tabIndex={isFocused ? 0 : -1}
       data-node-id={node.id}
+      aria-keyshortcuts="Enter Delete"
       className={cn(
-        'flex h-7 items-center text-sm text-app-text-primary',
+        'group flex h-7 items-center text-sm text-app-text-primary',
         isFocused && 'border-l-2 border-l-app-accent bg-[#EFF6FF]',
         !isFocused && 'hover:bg-[#F5F5F5]'
       )}
@@ -82,6 +92,13 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
         ...style,
         paddingLeft: `${depth * 16}px`,
         ...(isFocused ? { outline: '2px solid #3B82F6', outlineOffset: '2px' } : {}),
+      }}
+      onDoubleClick={(e) => {
+        if (!isEditing && onDoubleClick) {
+          e.preventDefault()
+          e.stopPropagation()
+          onDoubleClick()
+        }
       }}
     >
       {/* Chevron / Dash indicator */}
@@ -123,7 +140,25 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
           data-testid="tree-row-input"
         />
       ) : (
-        <span className="ml-1 truncate">{node.title}</span>
+        <>
+          <span className="ml-1 flex-1 truncate">{node.title}</span>
+          {onDelete && (
+            <button
+              type="button"
+              className="tree-row-delete mr-1 flex h-4 w-4 shrink-0 items-center justify-center opacity-0 transition-opacity focus-visible:opacity-100"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete()
+              }}
+              tabIndex={-1}
+              aria-label="Delete node"
+              title="Delete (or press Delete key)"
+              data-testid="tree-row-delete"
+            >
+              <Trash2 className="h-3 w-3 text-app-text-secondary hover:text-red-500" />
+            </button>
+          )}
+        </>
       )}
     </div>
   )

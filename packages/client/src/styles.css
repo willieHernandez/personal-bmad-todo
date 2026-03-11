@@ -218,3 +218,8 @@ body {
     @apply font-sans;
   }
 }
+
+/* Tree row delete button: show on row hover */
+[role="treeitem"]:hover .tree-row-delete {
+  opacity: 1;
+}
