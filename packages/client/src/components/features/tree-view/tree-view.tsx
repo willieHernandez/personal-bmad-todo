@@ -68,16 +68,25 @@ export function TreeView({ projectId }: TreeViewProps) {
     setExpanded,
   })
 
-  // Resolve pending focus after visibleNodes updates (e.g., after indent/outdent)
+  // Resolve pending focus after visibleNodes updates (e.g., after indent/outdent/delete)
   useEffect(() => {
     if (pendingFocusNodeId.current) {
       const newIndex = visibleNodes.findIndex((n) => n.node.id === pendingFocusNodeId.current)
       if (newIndex >= 0) {
+        // Force DOM re-focus even if focusedIndex value is the same (e.g., delete at index 0,
+        // next sibling now at index 0 — setFocusedIndex(0) is a no-op but we still need to
+        // focus the new DOM element)
+        if (newIndex === focusedIndex) {
+          const el = rowRefs.current.get(newIndex)
+          if (el && !editingNodeId) {
+            el.focus()
+          }
+        }
         setFocusedIndex(newIndex)
         pendingFocusNodeId.current = null
       }
     }
-  }, [visibleNodes, setFocusedIndex])
+  }, [visibleNodes, setFocusedIndex, focusedIndex, editingNodeId])
 
   // Sync focusedIndex → activeNodeId in Zustand store
   useEffect(() => {
@@ -154,7 +163,11 @@ export function TreeView({ projectId }: TreeViewProps) {
   const handleKeyDown = useCallback(
     async (e: React.KeyboardEvent) => {
       const target = e.target as HTMLElement
+      // Fall back to the currently focused node when e.target is the tree container
+      // (happens after delete removes the focused DOM element)
       const nodeId = target.getAttribute('data-node-id')
+        ?? visibleNodes[focusedIndex]?.node.id
+        ?? null
 
       // When in edit mode, don't handle navigation keys
       if (editingNodeId) return
@@ -240,6 +253,7 @@ export function TreeView({ projectId }: TreeViewProps) {
     },
     [
       editingNodeId,
+      focusedIndex,
       visibleNodes,
       createSibling,
       indentNode,
