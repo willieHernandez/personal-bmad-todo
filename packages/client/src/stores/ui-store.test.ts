@@ -88,4 +88,17 @@ describe('useUIStore', () => {
       expect(useUIStore.getState().openProjectIds).toEqual(['p3', 'p1', 'p2'])
     })
   })
+
+  describe('setFocusedNode', () => {
+    it('sets activeNodeId', () => {
+      useUIStore.getState().setFocusedNode('node-1')
+      expect(useUIStore.getState().activeNodeId).toBe('node-1')
+    })
+
+    it('clears activeNodeId when set to null', () => {
+      useUIStore.getState().setFocusedNode('node-1')
+      useUIStore.getState().setFocusedNode(null)
+      expect(useUIStore.getState().activeNodeId).toBeNull()
+    })
+  })
 })

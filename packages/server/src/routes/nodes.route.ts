@@ -159,7 +159,7 @@ export default async function nodesRoutes(app: FastifyInstance) {
     schema: { params: idParamSchema, body: moveNodeSchema },
   }, async (request, reply) => {
     try {
-      const node = await moveNode(request.params.id, request.body.newParentId, request.body.sortOrder);
+      const node = await moveNode(request.params.id, request.body.newParentId, request.body.sortOrder, request.body.newType);
       return reply.send(node);
     } catch (err) {
       if (err instanceof HierarchyError) {

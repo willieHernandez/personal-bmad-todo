@@ -17,6 +17,7 @@ export const updateNodeSchema = z.object({
 export const moveNodeSchema = z.object({
   newParentId: z.string().uuid(),
   sortOrder: z.number().int().min(0),
+  newType: z.enum([NodeType.PROJECT, NodeType.EFFORT, NodeType.TASK, NodeType.SUBTASK]).optional(),
 });
 
 export const reorderNodeSchema = z.object({

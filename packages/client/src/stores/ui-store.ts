@@ -7,6 +7,7 @@ interface UIState {
   setActiveProject: (id: string) => void
   closeProjectTab: (id: string) => void
   reorderTabs: (ids: string[]) => void
+  setFocusedNode: (id: string | null) => void
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -42,5 +43,9 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   reorderTabs: (ids: string[]) => {
     set({ openProjectIds: ids })
+  },
+
+  setFocusedNode: (id: string | null) => {
+    set({ activeNodeId: id })
   },
 }))

@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import { useUIStore } from '#/stores/ui-store'
 import { useProjects, useCreateProject } from '#/queries/node-queries'
+import { TreeView } from '#/components/features/tree-view/tree-view'
 
 export function ContentPanel() {
   const activeProjectId = useUIStore((s) => s.activeProjectId)
@@ -38,10 +39,8 @@ export function ContentPanel() {
   }
 
   return (
-    <div className="flex h-full items-center justify-center bg-app-bg">
-      <p className="text-sm text-app-text-secondary">
-        Tree view for {activeProject.title} (coming in Story 1.4)
-      </p>
+    <div className="flex h-full flex-1 flex-col overflow-hidden bg-app-bg">
+      <TreeView projectId={activeProjectId} />
     </div>
   )
 }
