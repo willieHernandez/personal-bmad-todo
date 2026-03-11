@@ -66,6 +66,18 @@ vi.mock('#/api/nodes.api', () => ({
   deleteNode: vi.fn(() => Promise.resolve()),
 }))
 
+const mockUpdateMutate = vi.fn()
+const mockDeleteMutate = vi.fn()
+
+vi.mock('#/queries/node-queries', () => ({
+  useUpdateNode: () => ({
+    mutate: mockUpdateMutate,
+  }),
+  useDeleteNode: () => ({
+    mutate: mockDeleteMutate,
+  }),
+}))
+
 // Mock the virtualizer to bypass jsdom layout limitations
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
@@ -126,7 +138,21 @@ describe('TreeView', () => {
     expect(useUIStore.getState().activeNodeId).toBe('e1')
   })
 
-  it('pressing Enter on focused node calls createSibling', () => {
+  it('pressing Enter on focused node enters rename mode', () => {
+    useUIStore.setState({ activeNodeId: 'e1' })
+
+    render(<TreeView projectId="proj-1" />, { wrapper: createWrapper() })
+
+    const items = screen.getAllByRole('treeitem')
+    fireEvent.keyDown(items[0], { key: 'Enter' })
+
+    // Should show an input with the current title pre-filled
+    const input = screen.getByTestId('tree-row-input')
+    expect(input).toBeDefined()
+    expect((input as HTMLInputElement).value).toBe('Effort One')
+  })
+
+  it('pressing Ctrl+Enter on focused node calls createSibling', () => {
     useUIStore.setState({ activeNodeId: 'e1' })
     mockCreateSibling.mockResolvedValue({
       id: 'new-1',
@@ -143,7 +169,7 @@ describe('TreeView', () => {
     render(<TreeView projectId="proj-1" />, { wrapper: createWrapper() })
 
     const items = screen.getAllByRole('treeitem')
-    fireEvent.keyDown(items[0], { key: 'Enter' })
+    fireEvent.keyDown(items[0], { key: 'Enter', ctrlKey: true })
 
     expect(mockCreateSibling).toHaveBeenCalled()
   })
