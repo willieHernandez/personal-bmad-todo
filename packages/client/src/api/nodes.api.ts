@@ -1,4 +1,4 @@
-import type { CreateNode, MoveNode, UpdateNode, NodeResponse } from '@todo-bmad-style/shared'
+import type { CreateNode, MoveNode, ReorderNode, UpdateNode, NodeResponse } from '@todo-bmad-style/shared'
 import { apiClient } from './client'
 
 export function getProjects(): Promise<NodeResponse[]> {
@@ -26,6 +26,13 @@ export function updateNode(id: string, data: UpdateNode): Promise<NodeResponse> 
 
 export function moveNode(id: string, data: MoveNode): Promise<NodeResponse> {
   return apiClient<NodeResponse>(`/nodes/${id}/move`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export function reorderNode(id: string, data: ReorderNode): Promise<NodeResponse> {
+  return apiClient<NodeResponse>(`/nodes/${id}/reorder`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   })

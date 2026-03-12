@@ -1,13 +1,23 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core'
+import type { DragStartEvent, DragOverEvent, DragEndEvent, CollisionDetection } from '@dnd-kit/core'
 import { Plus } from 'lucide-react'
 import { useTreeData } from '#/hooks/use-tree-data'
 import { useTreeOperations } from '#/hooks/use-tree-operations'
 import { useTreeNavigation } from '#/hooks/use-tree-navigation'
 import { useUIStore } from '#/stores/ui-store'
-import { useUpdateNode, useDeleteNode } from '#/queries/node-queries'
+import { useUpdateNode, useDeleteNode, useReorderNode, useMoveNode } from '#/queries/node-queries'
 import { TreeRow } from './tree-row'
 import type { FlatTreeNode } from '#/hooks/use-tree-data'
+import type { NodeType } from '@todo-bmad-style/shared'
 
 export function getDeleteFocusTarget(
   visibleNodes: FlatTreeNode[],
@@ -40,6 +50,93 @@ export function getDeleteFocusTarget(
   return null
 }
 
+// Hierarchy rules: which types can parent which child types
+const VALID_CHILD_TYPES: Record<string, NodeType> = {
+  project: 'effort',
+  effort: 'task',
+  task: 'subtask',
+}
+
+function isDescendant(
+  nodeId: string,
+  potentialAncestorId: string,
+  visibleNodes: FlatTreeNode[]
+): boolean {
+  const ancestorIdx = visibleNodes.findIndex((n) => n.node.id === potentialAncestorId)
+  if (ancestorIdx < 0) return false
+  const ancestorDepth = visibleNodes[ancestorIdx].depth
+
+  for (let i = ancestorIdx + 1; i < visibleNodes.length; i++) {
+    if (visibleNodes[i].depth <= ancestorDepth) break
+    if (visibleNodes[i].node.id === nodeId) return true
+  }
+  return false
+}
+
+export interface DropIndicator {
+  targetParentId: string | null
+  targetIndex: number
+  type: 'before' | 'after' | 'child'
+  targetNodeId: string
+}
+
+// Check if moving a node with children to a new type would break its subtree
+// The server only retypes the moved node, not its descendants, so children must
+// remain valid under the node's new type.
+function wouldBreakSubtree(draggedNode: FlatTreeNode, newParentType: string): boolean {
+  if (!draggedNode.hasChildren) return false
+  const newType = VALID_CHILD_TYPES[newParentType]
+  if (!newType) return true
+  // If the dragged node's type would change, its children retain their original
+  // types which become invalid under the new parent hierarchy
+  return newType !== draggedNode.node.type
+}
+
+export function isValidDropTarget(
+  draggedNode: FlatTreeNode,
+  targetNode: FlatTreeNode,
+  dropPosition: 'before' | 'after' | 'child',
+  visibleNodes: FlatTreeNode[]
+): boolean {
+  // Cannot drop on self
+  if (draggedNode.node.id === targetNode.node.id) return false
+
+  // Cannot drop on own descendant
+  if (isDescendant(targetNode.node.id, draggedNode.node.id, visibleNodes)) return false
+
+  if (dropPosition === 'child') {
+    // Target must be a type that can have children
+    const allowedChildType = VALID_CHILD_TYPES[targetNode.node.type]
+    if (!allowedChildType) return false
+    // Subtasks can't have children
+    if (targetNode.node.type === 'subtask') return false
+    // Prevent drops that would break the dragged node's subtree hierarchy
+    if (wouldBreakSubtree(draggedNode, targetNode.node.type)) return false
+    return true
+  }
+
+  // For before/after: we're inserting as a sibling of the target
+  // The target's parent must be a valid parent for the dragged node's new type
+  const targetParentId = targetNode.node.parentId
+  if (!targetParentId) return false // Cannot place at root level (only projects are root)
+
+  // Find the target's parent to check if it can accept the dragged node
+  const targetParent = visibleNodes.find((n) => n.node.id === targetParentId)
+  if (!targetParent) return false
+
+  const allowedChildType = VALID_CHILD_TYPES[targetParent.node.type]
+  if (!allowedChildType) return false
+
+  // Prevent drops that would break the dragged node's subtree hierarchy
+  if (wouldBreakSubtree(draggedNode, targetParent.node.type)) return false
+
+  return true
+}
+
+function computeNewType(targetParentType: string): NodeType | undefined {
+  return VALID_CHILD_TYPES[targetParentType]
+}
+
 interface TreeViewProps {
   projectId: string
 }
@@ -53,6 +150,8 @@ export function TreeView({ projectId }: TreeViewProps) {
   const { createChild, createSibling, indentNode, outdentNode } = useTreeOperations()
   const updateNodeMutation = useUpdateNode()
   const deleteNodeMutation = useDeleteNode()
+  const reorderNodeMutation = useReorderNode()
+  const moveNodeMutation = useMoveNode()
 
   const setFocusedNode = useUIStore((s) => s.setFocusedNode)
 
@@ -61,6 +160,36 @@ export function TreeView({ projectId }: TreeViewProps) {
   const [editValue, setEditValue] = useState('')
   const [isNewNode, setIsNewNode] = useState(false)
 
+  // DnD state
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null)
+  // Ref mirrors dropIndicator state so handleDragEnd always reads the latest value
+  // (avoids stale closure when onDragEnd fires before React commits the last setState)
+  const dropIndicatorRef = useRef<DropIndicator | null>(null)
+  const updateDropIndicator = useCallback((value: DropIndicator | null) => {
+    dropIndicatorRef.current = value
+    setDropIndicator(value)
+  }, [])
+
+  const activeFlatNode = useMemo(
+    () => (activeId ? visibleNodes.find((n) => n.node.id === activeId) ?? null : null),
+    [activeId, visibleNodes]
+  )
+
+  // DnD sensors with activation constraint to prevent accidental drags
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+
+  // Custom collision detection that filters out the active item's own droppable
+  // so closestCenter doesn't match a node with itself
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const filtered = args.droppableContainers.filter(
+      (container) => container.id !== args.active.id
+    )
+    return closestCenter({ ...args, droppableContainers: filtered })
+  }, [])
+
   // Keyboard navigation
   const { focusedIndex, setFocusedIndex, handleKeyDown: navHandleKeyDown } = useTreeNavigation({
     visibleNodes,
@@ -68,14 +197,21 @@ export function TreeView({ projectId }: TreeViewProps) {
     setExpanded,
   })
 
+  // Set cursor during drag: grabbing when over valid target, no-drop otherwise
+  useEffect(() => {
+    if (!activeId) {
+      document.body.style.cursor = ''
+      return
+    }
+    document.body.style.cursor = dropIndicator ? 'grabbing' : 'no-drop'
+    return () => { document.body.style.cursor = '' }
+  }, [activeId, dropIndicator])
+
   // Resolve pending focus after visibleNodes updates (e.g., after indent/outdent/delete)
   useEffect(() => {
     if (pendingFocusNodeId.current) {
       const newIndex = visibleNodes.findIndex((n) => n.node.id === pendingFocusNodeId.current)
       if (newIndex >= 0) {
-        // Force DOM re-focus even if focusedIndex value is the same (e.g., delete at index 0,
-        // next sibling now at index 0 — setFocusedIndex(0) is a no-op but we still need to
-        // focus the new DOM element)
         if (newIndex === focusedIndex) {
           const el = rowRefs.current.get(newIndex)
           if (el && !editingNodeId) {
@@ -130,7 +266,6 @@ export function TreeView({ projectId }: TreeViewProps) {
       const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
 
       if (!trimmed && isNewNode) {
-        // Empty name on new node creation — delete the placeholder via mutation
         if (flatNode) {
           deleteNodeMutation.mutate({
             id: nodeId,
@@ -142,13 +277,11 @@ export function TreeView({ projectId }: TreeViewProps) {
       }
 
       if (!trimmed && !isNewNode) {
-        // Empty name on rename — cancel (restore original title)
         clearEditing()
         return
       }
 
       if (flatNode && trimmed !== flatNode.node.title) {
-        // Both rename and new node creation use the optimistic update mutation
         updateNodeMutation.mutate({
           id: nodeId,
           data: { title: trimmed },
@@ -160,11 +293,176 @@ export function TreeView({ projectId }: TreeViewProps) {
     [editValue, isNewNode, visibleNodes, clearEditing, updateNodeMutation, deleteNodeMutation]
   )
 
+  // DnD handlers
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      if (editingNodeId) return
+      setActiveId(event.active.id as string)
+      updateDropIndicator(null)
+    },
+    [editingNodeId]
+  )
+
+  const handleDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const { active, over } = event
+      if (!over || !activeId) {
+        updateDropIndicator(null)
+        return
+      }
+
+      const draggedFlatNode = visibleNodes.find((n) => n.node.id === active.id)
+      const targetFlatNode = visibleNodes.find((n) => n.node.id === over.id)
+
+      if (!draggedFlatNode || !targetFlatNode) {
+        updateDropIndicator(null)
+        return
+      }
+
+      // Determine drop position from pointer Y relative to droppable item rect
+      const overRect = over.rect
+      if (!overRect) {
+        updateDropIndicator(null)
+        return
+      }
+
+      // Compute current pointer position from initial activator position + delta
+      const activatorEvent = event.activatorEvent as PointerEvent
+      const pointerY = activatorEvent.clientY + (event.delta?.y ?? 0)
+      const itemTop = overRect.top
+      const itemHeight = overRect.height
+
+      // If itemHeight is 0 (e.g., virtualized element not measured), default to 'after'
+      let dropPosition: 'before' | 'after' | 'child'
+      if (itemHeight <= 0) {
+        dropPosition = 'after'
+      } else {
+        const relativeY = pointerY - itemTop
+        const topZone = itemHeight * 0.25
+        const bottomZone = itemHeight * 0.75
+
+        if (relativeY < topZone) {
+          dropPosition = 'before'
+        } else if (relativeY > bottomZone) {
+          dropPosition = 'after'
+        } else {
+          dropPosition = 'child'
+        }
+      }
+
+      // Validate the drop
+      if (!isValidDropTarget(draggedFlatNode, targetFlatNode, dropPosition, visibleNodes)) {
+        // Try fallback positions
+        if (dropPosition === 'child') {
+          // Try before/after instead
+          if (isValidDropTarget(draggedFlatNode, targetFlatNode, 'after', visibleNodes)) {
+            dropPosition = 'after'
+          } else {
+            updateDropIndicator(null)
+            return
+          }
+        } else {
+          updateDropIndicator(null)
+          return
+        }
+      }
+
+      const targetParentId = dropPosition === 'child'
+        ? targetFlatNode.node.id
+        : targetFlatNode.node.parentId
+
+      // Compute target index
+      let targetIndex = 0
+      if (dropPosition === 'child') {
+        targetIndex = 0
+      } else {
+        // Find sibling index within target parent
+        const siblings = visibleNodes.filter((n) => n.node.parentId === targetParentId)
+        const siblingIdx = siblings.findIndex((n) => n.node.id === targetFlatNode.node.id)
+        targetIndex = dropPosition === 'before' ? siblingIdx : siblingIdx + 1
+      }
+
+      updateDropIndicator({
+        targetParentId,
+        targetIndex,
+        type: dropPosition,
+        targetNodeId: targetFlatNode.node.id,
+      })
+    },
+    [activeId, visibleNodes]
+  )
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active } = event
+      // Read from ref to avoid stale closure — state may not be committed yet
+      const currentDropIndicator = dropIndicatorRef.current
+
+      setActiveId(null)
+      updateDropIndicator(null)
+
+      if (!currentDropIndicator) return
+
+      const draggedFlatNode = visibleNodes.find((n) => n.node.id === active.id)
+      if (!draggedFlatNode) return
+
+      const { targetParentId, targetIndex, type: dropType } = currentDropIndicator
+      const isSameParent = draggedFlatNode.node.parentId === targetParentId
+
+      if (isSameParent && dropType !== 'child') {
+        // Reorder within same parent
+        // Adjust target index if needed (dragged node is removed from array first)
+        let adjustedIndex = targetIndex
+        const siblings = visibleNodes.filter((n) => n.node.parentId === targetParentId)
+        const currentIdx = siblings.findIndex((n) => n.node.id === draggedFlatNode.node.id)
+        if (currentIdx >= 0 && currentIdx < targetIndex) {
+          adjustedIndex = targetIndex - 1
+        }
+
+        if (adjustedIndex === currentIdx) return // No change
+
+        reorderNodeMutation.mutate({
+          id: draggedFlatNode.node.id,
+          parentId: draggedFlatNode.node.parentId,
+          sortOrder: adjustedIndex,
+        })
+      } else {
+        // Move to different parent
+        if (!targetParentId) return
+
+        const targetParent = visibleNodes.find((n) => n.node.id === targetParentId)
+        if (!targetParent) return
+
+        const newType = computeNewType(targetParent.node.type)
+
+        moveNodeMutation.mutate({
+          id: draggedFlatNode.node.id,
+          oldParentId: draggedFlatNode.node.parentId,
+          data: {
+            newParentId: targetParentId,
+            sortOrder: targetIndex,
+            newType,
+          },
+        })
+
+        // Expand the new parent so the moved node is visible
+        setExpanded(targetParentId, true)
+      }
+
+      // Restore focus to the dragged node
+      pendingFocusNodeId.current = draggedFlatNode.node.id
+    },
+    [visibleNodes, reorderNodeMutation, moveNodeMutation, setExpanded, updateDropIndicator]
+  )
+
+  const handleDragCancel = useCallback(() => {
+    setActiveId(null)
+    updateDropIndicator(null)
+  }, [updateDropIndicator])
+
   const handleKeyDown = useCallback(
     async (e: React.KeyboardEvent) => {
       const target = e.target as HTMLElement
-      // Fall back to the currently focused node when e.target is the tree container
-      // (happens after delete removes the focused DOM element)
       const nodeId = target.getAttribute('data-node-id')
         ?? visibleNodes[focusedIndex]?.node.id
         ?? null
@@ -177,7 +475,6 @@ export function TreeView({ projectId }: TreeViewProps) {
         e.preventDefault()
         if (!nodeId) return
 
-        // Schedule focus restoration for after the tree re-renders
         pendingFocusNodeId.current = nodeId
 
         if (e.shiftKey) {
@@ -191,7 +488,7 @@ export function TreeView({ projectId }: TreeViewProps) {
         return
       }
 
-      // Handle Ctrl+Enter for creating siblings (previously just Enter)
+      // Handle Ctrl+Enter for creating siblings
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
         if (!nodeId) return
@@ -217,14 +514,13 @@ export function TreeView({ projectId }: TreeViewProps) {
         const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
         if (!flatNode) return
 
-        // Enter on existing node = rename mode
         setEditingNodeId(nodeId)
         setEditValue(flatNode.node.title)
         setIsNewNode(false)
         return
       }
 
-      // Handle Delete/Backspace for node deletion (not during edit mode)
+      // Handle Delete/Backspace for node deletion
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
         if (!nodeId) return
@@ -232,15 +528,12 @@ export function TreeView({ projectId }: TreeViewProps) {
         const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
         if (!flatNode) return
 
-        // Compute focus target before deletion
         const focusTargetId = getDeleteFocusTarget(visibleNodes, nodeId)
 
-        // Set pending focus for after re-render
         if (focusTargetId) {
           pendingFocusNodeId.current = focusTargetId
         }
 
-        // Optimistic delete
         deleteNodeMutation.mutate({
           id: nodeId,
           parentId: flatNode.node.parentId,
@@ -317,94 +610,134 @@ export function TreeView({ projectId }: TreeViewProps) {
   }, [projectId, createChild, setFocusedNode])
 
   return (
-    <div
-      ref={parentRef}
-      role="tree"
-      aria-label="Project tree"
-      className="h-full overflow-auto"
-      onKeyDown={handleKeyDown}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={collisionDetection}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
-      {visibleNodes.length === 0 && (
-        <div className="flex flex-col items-center justify-center gap-2 p-8 text-center">
-          <p className="text-sm text-app-text-secondary">
-            No efforts yet. Create your first one to get started.
-          </p>
-          <button
-            type="button"
-            className="flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-app-text-primary transition-colors hover:bg-app-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent focus-visible:ring-offset-2"
-            onClick={handleCreateFirstEffort}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add effort
-          </button>
-        </div>
-      )}
       <div
-        style={{
-          height: `${virtualizer.getTotalSize()}px`,
-          position: 'relative',
-          width: '100%',
-        }}
+        ref={parentRef}
+        role="tree"
+        aria-label="Project tree"
+        className="h-full overflow-auto"
+        onKeyDown={handleKeyDown}
       >
-        {virtualizer.getVirtualItems().map((virtualRow) => {
-          const flatNode = visibleNodes[virtualRow.index]
-          return (
-            <div
-              key={flatNode.node.id}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                transform: `translateY(${virtualRow.start}px)`,
-                height: `${virtualRow.size}px`,
-                width: '100%',
-              }}
-              onClick={() => handleNodeClick(flatNode.node.id, virtualRow.index)}
+        {visibleNodes.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-2 p-8 text-center">
+            <p className="text-sm text-app-text-secondary">
+              No efforts yet. Create your first one to get started.
+            </p>
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-app-text-primary transition-colors hover:bg-app-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent focus-visible:ring-offset-2"
+              onClick={handleCreateFirstEffort}
             >
-              <TreeRow
-                ref={(el) => {
-                  if (el) {
-                    rowRefs.current.set(virtualRow.index, el)
-                  } else {
-                    rowRefs.current.delete(virtualRow.index)
-                  }
+              <Plus className="h-3.5 w-3.5" />
+              Add effort
+            </button>
+          </div>
+        )}
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            position: 'relative',
+            width: '100%',
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const flatNode = visibleNodes[virtualRow.index]
+            const isBeingDragged = activeId === flatNode.node.id
+            const showDropBefore = dropIndicator?.type === 'before' && dropIndicator.targetNodeId === flatNode.node.id
+            const showDropAfter = dropIndicator?.type === 'after' && dropIndicator.targetNodeId === flatNode.node.id
+            const showDropChild = dropIndicator?.type === 'child' && dropIndicator.targetNodeId === flatNode.node.id
+
+            return (
+              <div
+                key={flatNode.node.id}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  transform: `translateY(${virtualRow.start}px)`,
+                  height: `${virtualRow.size}px`,
+                  width: '100%',
                 }}
-                node={flatNode.node}
-                depth={flatNode.depth}
-                isExpanded={flatNode.isExpanded}
-                hasChildren={flatNode.hasChildren}
-                isFocused={focusedIndex === virtualRow.index}
-                isEditing={editingNodeId === flatNode.node.id}
-                isRenaming={editingNodeId === flatNode.node.id && !isNewNode}
-                editValue={editingNodeId === flatNode.node.id ? editValue : ''}
-                onToggleExpand={toggleExpand}
-                onEditChange={setEditValue}
-                onDoubleClick={() => handleNodeDoubleClick(flatNode.node.id)}
-                onDelete={() => handleNodeDelete(flatNode.node.id)}
-                onEditCommit={() =>
-                  editingNodeId && handleEditCommit(editingNodeId)
-                }
-                onEditCancel={() => {
-                  if (isNewNode && editingNodeId) {
-                    // New node creation cancelled — delete the placeholder via mutation
-                    const flatN = visibleNodes.find(
-                      (n) => n.node.id === editingNodeId
-                    )
-                    if (flatN) {
-                      deleteNodeMutation.mutate({
-                        id: editingNodeId,
-                        parentId: flatN.node.parentId,
-                      })
+                onClick={() => handleNodeClick(flatNode.node.id, virtualRow.index)}
+              >
+                {showDropBefore && (
+                  <div
+                    className="pointer-events-none absolute top-0 right-0 left-0 z-10 h-[2px] bg-[#3B82F6]"
+                    style={{ marginLeft: `${flatNode.depth * 16}px` }}
+                    data-testid="drop-indicator-before"
+                  />
+                )}
+                <TreeRow
+                  ref={(el) => {
+                    if (el) {
+                      rowRefs.current.set(virtualRow.index, el)
+                    } else {
+                      rowRefs.current.delete(virtualRow.index)
                     }
+                  }}
+                  node={flatNode.node}
+                  depth={flatNode.depth}
+                  isExpanded={flatNode.isExpanded}
+                  hasChildren={flatNode.hasChildren}
+                  isFocused={focusedIndex === virtualRow.index}
+                  isEditing={editingNodeId === flatNode.node.id}
+                  isRenaming={editingNodeId === flatNode.node.id && !isNewNode}
+                  editValue={editingNodeId === flatNode.node.id ? editValue : ''}
+                  isDragging={isBeingDragged}
+                  isDropTarget={showDropChild}
+                  onToggleExpand={toggleExpand}
+                  onEditChange={setEditValue}
+                  onDoubleClick={() => handleNodeDoubleClick(flatNode.node.id)}
+                  onDelete={() => handleNodeDelete(flatNode.node.id)}
+                  onEditCommit={() =>
+                    editingNodeId && handleEditCommit(editingNodeId)
                   }
-                  // For rename (isNewNode === false): just clear editing state, original title restored
-                  clearEditing()
-                }}
-              />
-            </div>
-          )
-        })}
+                  onEditCancel={() => {
+                    if (isNewNode && editingNodeId) {
+                      const flatN = visibleNodes.find(
+                        (n) => n.node.id === editingNodeId
+                      )
+                      if (flatN) {
+                        deleteNodeMutation.mutate({
+                          id: editingNodeId,
+                          parentId: flatN.node.parentId,
+                        })
+                      }
+                    }
+                    clearEditing()
+                  }}
+                />
+                {showDropAfter && (
+                  <div
+                    className="pointer-events-none absolute bottom-0 right-0 left-0 z-10 h-[2px] bg-[#3B82F6]"
+                    style={{ marginLeft: `${flatNode.depth * 16}px` }}
+                    data-testid="drop-indicator-after"
+                  />
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
-    </div>
+
+      <DragOverlay dropAnimation={null}>
+        {activeFlatNode && (
+          <div
+            className="flex h-7 items-center rounded border border-app-border bg-app-surface px-2 text-sm text-app-text-primary shadow-md"
+            style={{ transform: 'scale(1.02)' }}
+            data-testid="drag-overlay"
+          >
+            <span className="truncate">{activeFlatNode.node.title}</span>
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
   )
 }

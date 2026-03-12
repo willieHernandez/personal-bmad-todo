@@ -1,5 +1,6 @@
-import { forwardRef, useRef, useEffect } from 'react'
-import { ChevronRight, Minus, Trash2 } from 'lucide-react'
+import { forwardRef, useRef, useEffect, useCallback } from 'react'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { ChevronRight, Minus, Trash2, GripVertical } from 'lucide-react'
 import { cn } from '#/lib/utils'
 import type { NodeResponse } from '@todo-bmad-style/shared'
 
@@ -12,6 +13,8 @@ interface TreeRowProps {
   isEditing: boolean
   isRenaming?: boolean
   editValue: string
+  isDragging?: boolean
+  isDropTarget?: boolean
   onToggleExpand: (nodeId: string) => void
   onEditChange: (value: string) => void
   onEditCommit: () => void
@@ -31,6 +34,8 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
     isEditing,
     isRenaming,
     editValue,
+    isDragging,
+    isDropTarget,
     onToggleExpand,
     onEditChange,
     onEditCommit,
@@ -43,6 +48,28 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
 ) {
   const inputRef = useRef<HTMLInputElement>(null)
   const cancelledRef = useRef(false)
+
+  const { attributes, listeners, setNodeRef: setDragNodeRef } = useDraggable({
+    id: node.id,
+    disabled: isEditing,
+  })
+
+  const { setNodeRef: setDropNodeRef } = useDroppable({
+    id: node.id,
+  })
+
+  // Merge the forwardRef with the droppable ref
+  const setRowRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      setDropNodeRef(el)
+      if (typeof ref === 'function') {
+        ref(el)
+      } else if (ref) {
+        ref.current = el
+      }
+    },
+    [ref, setDropNodeRef]
+  )
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -75,7 +102,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
 
   return (
     <div
-      ref={ref}
+      ref={setRowRef}
       role="treeitem"
       aria-expanded={hasChildren ? isExpanded : undefined}
       aria-level={depth + 1}
@@ -86,7 +113,9 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
       className={cn(
         'group flex h-7 items-center text-sm text-app-text-primary',
         isFocused && 'border-l-2 border-l-app-accent bg-[#EFF6FF]',
-        !isFocused && 'hover:bg-[#F5F5F5]'
+        !isFocused && 'hover:bg-[#F5F5F5]',
+        isDragging && 'opacity-40 border border-dashed border-app-border',
+        isDropTarget && 'bg-[#EFF6FF]'
       )}
       style={{
         ...style,
@@ -101,6 +130,20 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
         }
       }}
     >
+      {/* Drag handle */}
+      <button
+        ref={setDragNodeRef}
+        type="button"
+        className="tree-row-drag-handle flex h-4 w-4 shrink-0 cursor-grab items-center justify-center opacity-0 transition-opacity active:cursor-grabbing focus-visible:opacity-100"
+        aria-label="Drag to reorder"
+        data-testid="tree-row-drag-handle"
+        {...listeners}
+        {...attributes}
+        tabIndex={-1}
+      >
+        <GripVertical className="h-3 w-3 text-app-text-secondary" />
+      </button>
+
       {/* Chevron / Dash indicator */}
       <button
         type="button"

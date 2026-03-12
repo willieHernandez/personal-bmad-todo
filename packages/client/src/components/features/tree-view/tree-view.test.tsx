@@ -68,6 +68,8 @@ vi.mock('#/api/nodes.api', () => ({
 
 const mockUpdateMutate = vi.fn()
 const mockDeleteMutate = vi.fn()
+const mockReorderMutate = vi.fn()
+const mockMoveMutate = vi.fn()
 
 vi.mock('#/queries/node-queries', () => ({
   useUpdateNode: () => ({
@@ -75,6 +77,12 @@ vi.mock('#/queries/node-queries', () => ({
   }),
   useDeleteNode: () => ({
     mutate: mockDeleteMutate,
+  }),
+  useReorderNode: () => ({
+    mutate: mockReorderMutate,
+  }),
+  useMoveNode: () => ({
+    mutate: mockMoveMutate,
   }),
 }))
 
