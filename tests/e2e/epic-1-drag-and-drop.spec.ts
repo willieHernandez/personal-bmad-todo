@@ -8,6 +8,7 @@ import {
   getTreeItemByText,
   getTreeItems,
   waitForTreeItem,
+  performDrag,
 } from './helpers';
 
 test.describe('Epic 1 - Story 1.7: Drag-and-Drop Reorder & Move', () => {
@@ -36,28 +37,19 @@ test.describe('Epic 1 - Story 1.7: Drag-and-Drop Reorder & Move', () => {
     const thirdItem = getTreeItemByText(page, 'Third');
     const firstItem = getTreeItemByText(page, 'First');
 
+    // Hover the row first to make the drag handle visible (group-hover:opacity-100)
+    await thirdItem.hover();
     const thirdHandle = thirdItem.getByTestId('tree-row-drag-handle');
-    const firstBox = await firstItem.boundingBox();
     const thirdHandleBox = await thirdHandle.boundingBox();
+    const firstBox = await firstItem.boundingBox();
 
     if (thirdHandleBox && firstBox) {
-      // Drag from Third's drag handle to above First
-      await page.mouse.move(
-        thirdHandleBox.x + thirdHandleBox.width / 2,
-        thirdHandleBox.y + thirdHandleBox.height / 2
-      );
-      await page.mouse.down();
-      // Move to above the first item
-      await page.mouse.move(
-        firstBox.x + firstBox.width / 2,
-        firstBox.y + 2,
-        { steps: 10 }
-      );
-      await page.mouse.up();
+      // Use evaluate to dispatch pointer events directly for reliable @dnd-kit interaction
+      await performDrag(page, thirdHandle, {
+        x: firstBox.x + firstBox.width / 2,
+        y: firstBox.y + 2,
+      });
     }
-
-    // Wait for the reorder to settle
-    await page.waitForTimeout(500);
 
     // Verify new order
     const items = getTreeItems(page);
@@ -188,29 +180,18 @@ test.describe('Epic 1 - Story 1.7: Drag-and-Drop Reorder & Move', () => {
     await waitForTreeItem(page, 'Beta');
 
     // Drag Beta above Alpha
-    const betaHandle = getTreeItemByText(page, 'Beta').getByTestId(
-      'tree-row-drag-handle'
-    );
+    const betaItem = getTreeItemByText(page, 'Beta');
+    await betaItem.hover();
+    const betaHandle = betaItem.getByTestId('tree-row-drag-handle');
     const alphaItem = getTreeItemByText(page, 'Alpha');
-
-    const betaHandleBox = await betaHandle.boundingBox();
     const alphaBox = await alphaItem.boundingBox();
 
-    if (betaHandleBox && alphaBox) {
-      await page.mouse.move(
-        betaHandleBox.x + betaHandleBox.width / 2,
-        betaHandleBox.y + betaHandleBox.height / 2
-      );
-      await page.mouse.down();
-      await page.mouse.move(
-        alphaBox.x + alphaBox.width / 2,
-        alphaBox.y + 2,
-        { steps: 10 }
-      );
-      await page.mouse.up();
+    if (alphaBox) {
+      await performDrag(page, betaHandle, {
+        x: alphaBox.x + alphaBox.width / 2,
+        y: alphaBox.y + 2,
+      });
     }
-
-    await page.waitForTimeout(500);
 
     // Reload and verify order persisted
     await page.reload();
@@ -244,10 +225,10 @@ test.describe('Epic 1 - Story 1.7: Drag-and-Drop Reorder & Move', () => {
 
     // The drag handle should not initiate a drag while editing
     // (The draggable is disabled when isEditing is true)
-    // We verify the edit input is still active after attempting drag
-    const handle = getTreeItemByText(page, 'Edit Node').getByTestId(
-      'tree-row-drag-handle'
-    );
+    // Get the handle reference while the input is visible (use treeitem with input filter
+    // since input value isn't part of textContent and text-based locators won't match)
+    const editRow = page.getByRole('treeitem').filter({ has: page.getByTestId('tree-row-input') });
+    const handle = editRow.getByTestId('tree-row-drag-handle');
     const handleBox = await handle.boundingBox();
 
     if (handleBox) {
@@ -264,10 +245,7 @@ test.describe('Epic 1 - Story 1.7: Drag-and-Drop Reorder & Move', () => {
       await page.mouse.up();
     }
 
-    // The input should still be visible (drag didn't activate)
-    await expect(input).toBeVisible();
-
-    // Cancel the edit
-    await input.press('Escape');
+    // The drag overlay should NOT have appeared (draggable is disabled during edit)
+    await expect(page.getByTestId('drag-overlay')).toBeHidden();
   });
 });

@@ -14,7 +14,7 @@ export function Sidebar() {
   return (
     <nav className="flex h-full flex-col overflow-y-auto border-r border-app-border bg-app-surface">
       <SidebarSection title="Inbox">
-        <div className="px-4 py-2 text-xs text-app-text-muted">Inbox</div>
+        <div className="px-4 py-2 text-xs text-app-text-muted">No inbox items</div>
       </SidebarSection>
 
       <SidebarSection title="Pinned">

@@ -37,10 +37,10 @@ test.describe('Epic 1 - Story 1.3: App Layout & Project Sidebar', () => {
   test('sidebar displays collapsible sections: Inbox, Pinned, Recent, On Hold', async ({
     page,
   }) => {
-    await expect(page.getByText('Inbox')).toBeVisible();
-    await expect(page.getByText('Pinned')).toBeVisible();
-    await expect(page.getByText('Recent')).toBeVisible();
-    await expect(page.getByText('On Hold')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Inbox' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pinned' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Recent' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'On Hold' })).toBeVisible();
   });
 
   test('sidebar sections are collapsible', async ({ page }) => {
@@ -92,17 +92,15 @@ test.describe('Epic 1 - Story 1.3: App Layout & Project Sidebar', () => {
     await page.reload();
     await page.locator('nav').first().waitFor({ state: 'visible' });
 
-    // Click the project
-    await page.getByRole('button', { name: 'My Project' }).click();
+    // Click the project in the sidebar
+    await page.locator('nav').first().getByRole('button', { name: 'My Project' }).click();
 
     // The project tab should appear in the tab bar
     await expect(page.getByRole('tab', { name: /My Project/ })).toBeVisible();
 
-    // The content panel should show the tree view (or the "no efforts" empty state)
+    // The content panel should show the tree view
     await expect(
-      page.getByRole('tree', { name: 'Project tree' }).or(
-        page.getByText('No efforts yet')
-      )
+      page.getByRole('tree', { name: 'Project tree' })
     ).toBeVisible();
   });
 
@@ -111,7 +109,7 @@ test.describe('Epic 1 - Story 1.3: App Layout & Project Sidebar', () => {
 
     // Should be visible in sidebar
     await expect(
-      page.getByRole('button', { name: 'Brand New Project' })
+      page.locator('nav').first().getByRole('button', { name: 'Brand New Project' })
     ).toBeVisible();
 
     // Should be in the tab bar

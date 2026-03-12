@@ -1,6 +1,6 @@
-import { type Page, expect } from '@playwright/test';
+import { type Page, type Locator, expect } from '@playwright/test';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = '/api';
 
 /**
  * Reset the database to a clean state by deleting all projects.
@@ -127,7 +127,40 @@ export async function createProjectViaUI(
   await input.fill(title);
   await input.press('Enter');
   // Wait for project to appear in sidebar
-  await expect(page.getByRole('button', { name: title })).toBeVisible();
+  await expect(page.locator('nav').first().getByRole('button', { name: title })).toBeVisible();
+}
+
+/**
+ * Perform a drag from a source locator to a target position using Playwright's
+ * trusted mouse events. Moves in steps for reliable @dnd-kit PointerSensor
+ * activation and drop indicator computation.
+ */
+export async function performDrag(
+  page: Page,
+  sourceHandle: Locator,
+  targetPos: { x: number; y: number }
+): Promise<void> {
+  const handleBox = await sourceHandle.boundingBox();
+  if (!handleBox) throw new Error('Source handle not found');
+
+  const startX = handleBox.x + handleBox.width / 2;
+  const startY = handleBox.y + handleBox.height / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+
+  // Move in steps to target position
+  const steps = 15;
+  for (let i = 1; i <= steps; i++) {
+    const ratio = i / steps;
+    const x = startX + (targetPos.x - startX) * ratio;
+    const y = startY + (targetPos.y - startY) * ratio;
+    await page.mouse.move(x, y);
+  }
+
+  // Brief pause to let @dnd-kit process the final position before releasing
+  await page.waitForTimeout(100);
+  await page.mouse.up();
 }
 
 /**

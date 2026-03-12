@@ -8,12 +8,13 @@ import {
   useSensors,
   closestCenter,
 } from '@dnd-kit/core'
-import type { DragStartEvent, DragOverEvent, DragEndEvent, CollisionDetection } from '@dnd-kit/core'
+import type { DragStartEvent, DragOverEvent, DragEndEvent, DragMoveEvent, CollisionDetection } from '@dnd-kit/core'
 import { Plus } from 'lucide-react'
 import { useTreeData } from '#/hooks/use-tree-data'
 import { useTreeOperations } from '#/hooks/use-tree-operations'
 import { useTreeNavigation } from '#/hooks/use-tree-navigation'
 import { useUIStore } from '#/stores/ui-store'
+import { useDetailPanelStore } from '#/stores/detail-panel-store'
 import { useUpdateNode, useDeleteNode, useReorderNode, useMoveNode } from '#/queries/node-queries'
 import { TreeRow } from './tree-row'
 import type { FlatTreeNode } from '#/hooks/use-tree-data'
@@ -120,6 +121,9 @@ export function isValidDropTarget(
   const targetParentId = targetNode.node.parentId
   if (!targetParentId) return false // Cannot place at root level (only projects are root)
 
+  // If dragged node and target share the same parent, it's a same-parent reorder — always valid
+  if (draggedNode.node.parentId === targetParentId) return true
+
   // Find the target's parent to check if it can accept the dragged node
   const targetParent = visibleNodes.find((n) => n.node.id === targetParentId)
   if (!targetParent) return false
@@ -154,6 +158,7 @@ export function TreeView({ projectId }: TreeViewProps) {
   const moveNodeMutation = useMoveNode()
 
   const setFocusedNode = useUIStore((s) => s.setFocusedNode)
+  const openTab = useDetailPanelStore((s) => s.openTab)
 
   // Editing state
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
@@ -166,6 +171,8 @@ export function TreeView({ projectId }: TreeViewProps) {
   // Ref mirrors dropIndicator state so handleDragEnd always reads the latest value
   // (avoids stale closure when onDragEnd fires before React commits the last setState)
   const dropIndicatorRef = useRef<DropIndicator | null>(null)
+  // Track current pointer Y during drag (onDragOver delta is stale since it only fires on over-change)
+  const currentPointerYRef = useRef<number | null>(null)
   const updateDropIndicator = useCallback((value: DropIndicator | null) => {
     dropIndicatorRef.current = value
     setDropIndicator(value)
@@ -293,25 +300,19 @@ export function TreeView({ projectId }: TreeViewProps) {
     [editValue, isNewNode, visibleNodes, clearEditing, updateNodeMutation, deleteNodeMutation]
   )
 
-  // DnD handlers
-  const handleDragStart = useCallback(
-    (event: DragStartEvent) => {
-      if (editingNodeId) return
-      setActiveId(event.active.id as string)
-      updateDropIndicator(null)
-    },
-    [editingNodeId]
-  )
+  // Ref to store the current 'over' target during drag (so onDragMove can access it)
+  const currentOverRef = useRef<DragOverEvent['over']>(null)
 
-  const handleDragOver = useCallback(
-    (event: DragOverEvent) => {
-      const { active, over } = event
-      if (!over || !activeId) {
+  // Shared helper: compute and update the drop indicator based on pointer position and over target
+  const computeDropIndicator = useCallback(
+    (activeNodeId: string, pointerY: number) => {
+      const over = currentOverRef.current
+      if (!over) {
         updateDropIndicator(null)
         return
       }
 
-      const draggedFlatNode = visibleNodes.find((n) => n.node.id === active.id)
+      const draggedFlatNode = visibleNodes.find((n) => n.node.id === activeNodeId)
       const targetFlatNode = visibleNodes.find((n) => n.node.id === over.id)
 
       if (!draggedFlatNode || !targetFlatNode) {
@@ -319,20 +320,15 @@ export function TreeView({ projectId }: TreeViewProps) {
         return
       }
 
-      // Determine drop position from pointer Y relative to droppable item rect
       const overRect = over.rect
       if (!overRect) {
         updateDropIndicator(null)
         return
       }
 
-      // Compute current pointer position from initial activator position + delta
-      const activatorEvent = event.activatorEvent as PointerEvent
-      const pointerY = activatorEvent.clientY + (event.delta?.y ?? 0)
       const itemTop = overRect.top
       const itemHeight = overRect.height
 
-      // If itemHeight is 0 (e.g., virtualized element not measured), default to 'after'
       let dropPosition: 'before' | 'after' | 'child'
       if (itemHeight <= 0) {
         dropPosition = 'after'
@@ -352,9 +348,7 @@ export function TreeView({ projectId }: TreeViewProps) {
 
       // Validate the drop
       if (!isValidDropTarget(draggedFlatNode, targetFlatNode, dropPosition, visibleNodes)) {
-        // Try fallback positions
         if (dropPosition === 'child') {
-          // Try before/after instead
           if (isValidDropTarget(draggedFlatNode, targetFlatNode, 'after', visibleNodes)) {
             dropPosition = 'after'
           } else {
@@ -371,12 +365,10 @@ export function TreeView({ projectId }: TreeViewProps) {
         ? targetFlatNode.node.id
         : targetFlatNode.node.parentId
 
-      // Compute target index
       let targetIndex = 0
       if (dropPosition === 'child') {
         targetIndex = 0
       } else {
-        // Find sibling index within target parent
         const siblings = visibleNodes.filter((n) => n.node.parentId === targetParentId)
         const siblingIdx = siblings.findIndex((n) => n.node.id === targetFlatNode.node.id)
         targetIndex = dropPosition === 'before' ? siblingIdx : siblingIdx + 1
@@ -389,7 +381,48 @@ export function TreeView({ projectId }: TreeViewProps) {
         targetNodeId: targetFlatNode.node.id,
       })
     },
-    [activeId, visibleNodes]
+    [visibleNodes, updateDropIndicator]
+  )
+
+  // DnD handlers
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      if (editingNodeId) return
+      setActiveId(event.active.id as string)
+      currentOverRef.current = null
+      currentPointerYRef.current = null
+      updateDropIndicator(null)
+    },
+    [editingNodeId, updateDropIndicator]
+  )
+
+  const handleDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const { over } = event
+      currentOverRef.current = over
+      if (!over || !activeId) {
+        updateDropIndicator(null)
+        return
+      }
+      // Use tracked pointer position if available, otherwise compute from event
+      const pointerY = currentPointerYRef.current
+        ?? (event.activatorEvent as PointerEvent).clientY + (event.delta?.y ?? 0)
+      computeDropIndicator(activeId, pointerY)
+    },
+    [activeId, computeDropIndicator, updateDropIndicator]
+  )
+
+  const handleDragMove = useCallback(
+    (event: DragMoveEvent) => {
+      if (!activeId) return
+      // Track the current pointer Y position
+      const activatorEvent = event.activatorEvent as PointerEvent
+      const pointerY = activatorEvent.clientY + (event.delta?.y ?? 0)
+      currentPointerYRef.current = pointerY
+      // Recompute drop indicator with updated pointer position
+      computeDropIndicator(activeId, pointerY)
+    },
+    [activeId, computeDropIndicator]
   )
 
   const handleDragEnd = useCallback(
@@ -457,6 +490,8 @@ export function TreeView({ projectId }: TreeViewProps) {
 
   const handleDragCancel = useCallback(() => {
     setActiveId(null)
+    currentOverRef.current = null
+    currentPointerYRef.current = null
     updateDropIndicator(null)
   }, [updateDropIndicator])
 
@@ -565,8 +600,11 @@ export function TreeView({ projectId }: TreeViewProps) {
       }
       setFocusedIndex(index)
       setFocusedNode(nodeId)
+      if (!editingNodeId) {
+        openTab(nodeId)
+      }
     },
-    [editingNodeId, handleEditCommit, setFocusedNode, setFocusedIndex]
+    [editingNodeId, handleEditCommit, setFocusedNode, setFocusedIndex, openTab]
   )
 
   const handleNodeDoubleClick = useCallback(
@@ -614,6 +652,7 @@ export function TreeView({ projectId }: TreeViewProps) {
       sensors={sensors}
       collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
