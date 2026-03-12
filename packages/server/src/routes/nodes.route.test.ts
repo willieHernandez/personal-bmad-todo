@@ -185,6 +185,43 @@ describe('nodes routes', () => {
     });
   });
 
+  describe('GET /api/nodes/:id/ancestors', () => {
+    it('should return ancestor chain from root to node', async () => {
+      const project = await createProject();
+      const effort = await createEffort(project.id);
+      const task = await createTask(effort.id);
+
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/nodes/${task.id}/ancestors`,
+      });
+      expect(res.statusCode).toBe(200);
+      const ancestors = res.json();
+      expect(ancestors).toHaveLength(3);
+      expect(ancestors[0].id).toBe(project.id);
+      expect(ancestors[1].id).toBe(effort.id);
+      expect(ancestors[2].id).toBe(task.id);
+    });
+
+    it('should return single item for project node', async () => {
+      const project = await createProject();
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/nodes/${project.id}/ancestors`,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toHaveLength(1);
+    });
+
+    it('should return 404 for missing node', async () => {
+      const res = await server.inject({
+        method: 'GET',
+        url: '/api/nodes/00000000-0000-0000-0000-000000000000/ancestors',
+      });
+      expect(res.statusCode).toBe(404);
+    });
+  });
+
   describe('GET /api/nodes/:id/children', () => {
     it('should return sorted children', async () => {
       const project = await createProject();

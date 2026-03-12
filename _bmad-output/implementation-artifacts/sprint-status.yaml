@@ -53,7 +53,7 @@ development_status:
   epic-2: in-progress
   2-1-detail-panel-and-tabbed-views: done
   2-2-markdown-editor-and-auto-save: done
-  2-3-breadcrumb-navigation-and-inline-effort-markdown: backlog
+  2-3-breadcrumb-navigation-and-inline-effort-markdown: done
   epic-2-retrospective: optional
 
   epic-3: backlog

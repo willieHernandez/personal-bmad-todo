@@ -271,6 +271,19 @@ export async function moveNode(id: string, newParentId: string, sortOrder: numbe
   return await getNodeById(id);
 }
 
+export async function getNodeAncestors(id: string) {
+  const ancestors = [];
+  let current = await getNodeById(id);
+  ancestors.unshift(current);
+
+  while (current.parentId) {
+    current = await getNodeById(current.parentId);
+    ancestors.unshift(current);
+  }
+
+  return ancestors;
+}
+
 async function reindexChildren(parentId: string) {
   const children = await db
     .select()

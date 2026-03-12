@@ -29,9 +29,25 @@ const mockNodes: Record<string, NodeResponse> = {
   },
 }
 
+const mockAncestors: Record<string, NodeResponse[]> = {
+  'node-1': [
+    { id: 'proj-1', title: 'Project', type: 'project', parentId: null as unknown as string, sortOrder: 0, isCompleted: false, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+    mockNodes['node-1'],
+  ],
+  'node-2': [
+    { id: 'proj-1', title: 'Project', type: 'project', parentId: null as unknown as string, sortOrder: 0, isCompleted: false, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+    mockNodes['node-2'],
+  ],
+}
+
 vi.mock('#/queries/node-queries', () => ({
   useNode: (nodeId: string) => ({
     data: mockNodes[nodeId] ?? null,
+    isLoading: false,
+    error: null,
+  }),
+  useNodeAncestors: (nodeId: string) => ({
+    data: mockAncestors[nodeId] ?? undefined,
     isLoading: false,
     error: null,
   }),
