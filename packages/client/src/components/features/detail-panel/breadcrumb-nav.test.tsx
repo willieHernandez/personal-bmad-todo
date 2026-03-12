@@ -29,6 +29,9 @@ vi.mock('#/queries/node-queries', () => ({
     isLoading: false,
     error: null,
   }),
+  useToggleNodeCompletion: () => ({
+    mutate: vi.fn(),
+  }),
 }))
 
 vi.mock('#/stores/ui-store', () => ({

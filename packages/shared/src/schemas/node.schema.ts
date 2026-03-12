@@ -25,6 +25,13 @@ export const reorderNodeSchema = z.object({
   sortOrder: z.number().int().min(0),
 });
 
+export const toggleCompletionResponseSchema = z.object({
+  affectedNodes: z.array(z.object({
+    id: z.string().uuid(),
+    isCompleted: z.boolean(),
+  })),
+});
+
 export const nodeResponseSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),

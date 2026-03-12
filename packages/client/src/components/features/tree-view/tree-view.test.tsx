@@ -70,6 +70,7 @@ const mockUpdateMutate = vi.fn()
 const mockDeleteMutate = vi.fn()
 const mockReorderMutate = vi.fn()
 const mockMoveMutate = vi.fn()
+const mockToggleCompletionMutate = vi.fn()
 
 vi.mock('#/queries/node-queries', () => ({
   useUpdateNode: () => ({
@@ -83,6 +84,9 @@ vi.mock('#/queries/node-queries', () => ({
   }),
   useMoveNode: () => ({
     mutate: mockMoveMutate,
+  }),
+  useToggleNodeCompletion: () => ({
+    mutate: mockToggleCompletionMutate,
   }),
 }))
 

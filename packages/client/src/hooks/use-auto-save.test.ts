@@ -9,6 +9,9 @@ vi.mock('#/queries/node-queries', () => ({
   useUpdateNode: () => ({
     mutate: mockMutate,
   }),
+  useToggleNodeCompletion: () => ({
+    mutate: vi.fn(),
+  }),
 }))
 
 function createMockEditor(markdown = 'test content'): Editor {

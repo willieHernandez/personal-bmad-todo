@@ -15,7 +15,7 @@ import { useTreeOperations } from '#/hooks/use-tree-operations'
 import { useTreeNavigation } from '#/hooks/use-tree-navigation'
 import { useUIStore } from '#/stores/ui-store'
 import { useDetailPanelStore } from '#/stores/detail-panel-store'
-import { useUpdateNode, useDeleteNode, useReorderNode, useMoveNode } from '#/queries/node-queries'
+import { useUpdateNode, useDeleteNode, useReorderNode, useMoveNode, useToggleNodeCompletion } from '#/queries/node-queries'
 import { TreeRow } from './tree-row'
 import { InlineEffortMarkdown } from './inline-effort-markdown'
 import type { FlatTreeNode } from '#/hooks/use-tree-data'
@@ -159,6 +159,7 @@ export function TreeView({ projectId }: TreeViewProps) {
   const deleteNodeMutation = useDeleteNode()
   const reorderNodeMutation = useReorderNode()
   const moveNodeMutation = useMoveNode()
+  const toggleCompletionMutation = useToggleNodeCompletion()
 
   const setFocusedNode = useUIStore((s) => s.setFocusedNode)
   const openTab = useDetailPanelStore((s) => s.openTab)
@@ -640,6 +641,18 @@ export function TreeView({ projectId }: TreeViewProps) {
     [visibleNodes, deleteNodeMutation]
   )
 
+  const handleToggleComplete = useCallback(
+    (nodeId: string) => {
+      const flatNode = visibleNodes.find((n) => n.node.id === nodeId)
+      if (!flatNode) return
+      toggleCompletionMutation.mutate({
+        id: nodeId,
+        parentId: flatNode.node.parentId,
+      })
+    },
+    [visibleNodes, toggleCompletionMutation]
+  )
+
   const handleCreateFirstEffort = useCallback(async () => {
     const result = await createChild(projectId, 'effort')
     if (result) {
@@ -740,6 +753,7 @@ export function TreeView({ projectId }: TreeViewProps) {
                   isDragging={isBeingDragged}
                   isDropTarget={showDropChild}
                   onToggleExpand={toggleExpand}
+                  onToggleComplete={handleToggleComplete}
                   onEditChange={setEditValue}
                   onDoubleClick={() => handleNodeDoubleClick(flatNode.node.id)}
                   onDelete={() => handleNodeDelete(flatNode.node.id)}

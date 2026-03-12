@@ -10,6 +10,9 @@ vi.mock('#/queries/node-queries', () => ({
   useCreateNode: () => ({
     mutateAsync: mockMutateAsync,
   }),
+  useToggleNodeCompletion: () => ({
+    mutate: vi.fn(),
+  }),
 }))
 
 vi.mock('#/api/nodes.api', () => ({

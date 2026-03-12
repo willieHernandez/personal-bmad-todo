@@ -25,6 +25,9 @@ vi.mock('#/queries/node-queries', () => ({
   useCreateProject: () => ({
     mutate: mockMutate,
   }),
+  useToggleNodeCompletion: () => ({
+    mutate: vi.fn(),
+  }),
 }))
 
 vi.mock('#/components/features/tree-view/tree-view', () => ({

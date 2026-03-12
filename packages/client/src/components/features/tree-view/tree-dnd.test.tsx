@@ -95,6 +95,7 @@ vi.mock('#/queries/node-queries', () => ({
   useDeleteNode: () => ({ mutate: mockDeleteMutate }),
   useReorderNode: () => ({ mutate: mockReorderMutate }),
   useMoveNode: () => ({ mutate: mockMoveMutate }),
+  useToggleNodeCompletion: () => ({ mutate: vi.fn() }),
 }))
 
 vi.mock('@tanstack/react-virtual', () => ({

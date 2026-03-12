@@ -304,4 +304,45 @@ describe('nodes routes', () => {
       expect(res.statusCode).toBe(400);
     });
   });
+
+  describe('POST /api/nodes/:id/complete', () => {
+    it('should return 200 with affectedNodes array', async () => {
+      const project = await createProject();
+      const res = await server.inject({
+        method: 'POST',
+        url: `/api/nodes/${project.id}/complete`,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.affectedNodes).toBeDefined();
+      expect(Array.isArray(body.affectedNodes)).toBe(true);
+      expect(body.affectedNodes).toHaveLength(1);
+      expect(body.affectedNodes[0].id).toBe(project.id);
+      expect(body.affectedNodes[0].isCompleted).toBe(true);
+    });
+
+    it('should return 404 for non-existent node', async () => {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/api/nodes/00000000-0000-0000-0000-000000000000/complete',
+      });
+      expect(res.statusCode).toBe(404);
+    });
+
+    it('should return response matching toggleCompletionResponseSchema', async () => {
+      const { toggleCompletionResponseSchema } = await import('@todo-bmad-style/shared');
+      const project = await createProject();
+      const effort = await createEffort(project.id);
+
+      const res = await server.inject({
+        method: 'POST',
+        url: `/api/nodes/${effort.id}/complete`,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      // Validate response against the actual Zod schema (catches UUID format, extra props, etc.)
+      const parsed = toggleCompletionResponseSchema.parse(body);
+      expect(parsed.affectedNodes.length).toBeGreaterThan(0);
+    });
+  });
 });

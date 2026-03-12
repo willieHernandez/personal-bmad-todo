@@ -64,6 +64,9 @@ vi.mock('#/queries/node-queries', () => ({
     if (parentId === 't1') return { data: mockSubtasks }
     return { data: [] }
   }),
+  useToggleNodeCompletion: () => ({
+    mutate: vi.fn(),
+  }),
 }))
 
 vi.mock('#/api/nodes.api', () => ({

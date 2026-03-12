@@ -31,6 +31,9 @@ vi.mock('#/queries/node-queries', () => ({
   useUpdateNode: () => ({
     mutate: vi.fn(),
   }),
+  useToggleNodeCompletion: () => ({
+    mutate: vi.fn(),
+  }),
 }))
 
 vi.mock('#/hooks/use-auto-save', () => ({

@@ -8,6 +8,7 @@ export {
   updateNodeSchema,
   moveNodeSchema,
   reorderNodeSchema,
+  toggleCompletionResponseSchema,
   nodeResponseSchema,
 } from './schemas/node.schema.js';
 export {
@@ -21,5 +22,6 @@ export type {
   UpdateNode,
   MoveNode,
   ReorderNode,
+  ToggleCompletionResponse,
   NodeResponse,
 } from './types/node.types.js';

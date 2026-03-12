@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProjects, getNodeChildren, getNode, getNodeAncestors, createNode, updateNode, deleteNode, reorderNode, moveNode } from '../api/nodes.api'
+import { getProjects, getNodeChildren, getNode, getNodeAncestors, createNode, updateNode, deleteNode, reorderNode, moveNode, toggleNodeCompletion } from '../api/nodes.api'
 import type { CreateNode, MoveNode, NodeResponse, UpdateNode } from '@todo-bmad-style/shared'
 
 export function useProjects() {
@@ -164,6 +164,61 @@ export function useCreateNode() {
       queryClient.invalidateQueries({
         queryKey: ['nodes', parentId, 'children'],
       })
+    },
+  })
+}
+
+export function useToggleNodeCompletion() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id }: { id: string; parentId: string | null }) =>
+      toggleNodeCompletion(id),
+    onMutate: async ({ id, parentId }) => {
+      const queryKey = ['nodes', parentId, 'children'] as const
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<NodeResponse[]>(queryKey)
+      queryClient.setQueryData<NodeResponse[]>(queryKey, (old) =>
+        old?.map((n) => (n.id === id ? { ...n, isCompleted: !n.isCompleted } : n))
+      )
+      // Optimistically update the detail query so the detail panel reflects completion instantly
+      const detailKey = ['nodes', id, 'detail'] as const
+      const previousDetail = queryClient.getQueryData<NodeResponse>(detailKey)
+      if (previousDetail) {
+        queryClient.setQueryData<NodeResponse>(detailKey, { ...previousDetail, isCompleted: !previousDetail.isCompleted })
+      }
+      return { previous, queryKey, previousDetail, detailKey }
+    },
+    onError: (_err, _vars, context) => {
+      if (context) {
+        queryClient.setQueryData(context.queryKey, context.previous)
+        if (context.previousDetail) {
+          queryClient.setQueryData(context.detailKey, context.previousDetail)
+        }
+      }
+    },
+    onSettled: (data, _err, _vars, context) => {
+      if (context) {
+        // Invalidate the toggled node's parent children cache
+        queryClient.invalidateQueries({ queryKey: context.queryKey })
+        // Invalidate the toggled node's detail cache
+        queryClient.invalidateQueries({ queryKey: context.detailKey })
+      }
+      if (data) {
+        // Invalidate children caches for all ancestors affected by cascade
+        const affectedIds = new Set(data.affectedNodes.map((n) => n.id))
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            if (query.queryKey[0] !== 'nodes') return false
+            const parentId = query.queryKey[1]
+            if (typeof parentId === 'string' && affectedIds.has(parentId)) return true
+            return false
+          },
+        })
+        // Invalidate ancestor queries so breadcrumbs reflect cascade changes
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'nodes' && query.queryKey[2] === 'ancestors',
+        })
+      }
     },
   })
 }

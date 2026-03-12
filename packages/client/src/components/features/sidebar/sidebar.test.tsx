@@ -31,6 +31,7 @@ const mockProjects = [
 
 vi.mock('#/queries/node-queries', () => ({
   useProjects: () => ({ data: mockProjects, isLoading: false }),
+  useToggleNodeCompletion: () => ({ mutate: vi.fn() }),
 }))
 
 describe('Sidebar', () => {
