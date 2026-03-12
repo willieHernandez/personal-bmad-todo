@@ -35,6 +35,16 @@ vi.mock('#/queries/node-queries', () => ({
     isLoading: false,
     error: null,
   }),
+  useUpdateNode: () => ({
+    mutate: vi.fn(),
+  }),
+}))
+
+vi.mock('#/hooks/use-auto-save', () => ({
+  useAutoSave: () => ({
+    error: null,
+    flush: vi.fn(),
+  }),
 }))
 
 function createWrapper() {
@@ -68,14 +78,18 @@ describe('DetailContent', () => {
     expect(screen.getByText('task')).toBeDefined()
   })
 
-  it('displays markdownBody as text', () => {
+  it('renders MarkdownEditor with correct props', () => {
     render(<DetailContent nodeId="node-1" />, { wrapper: createWrapper() })
-    expect(screen.getByText('Hello **world**')).toBeDefined()
+    // MarkdownEditor renders a textbox with aria-label containing the node title
+    const textbox = screen.getByRole('textbox')
+    expect(textbox.getAttribute('aria-label')).toBe('Markdown notes for Test Task')
   })
 
-  it('shows placeholder when markdownBody is empty', () => {
+  it('renders MarkdownEditor for empty markdown (no old placeholder)', () => {
     render(<DetailContent nodeId="node-2" />, { wrapper: createWrapper() })
-    expect(screen.getByText(/No content yet/)).toBeDefined()
+    // MarkdownEditor should render even when markdownBody is empty
+    const textbox = screen.getByRole('textbox')
+    expect(textbox).toBeDefined()
   })
 
   it('shows completed status for completed nodes', () => {

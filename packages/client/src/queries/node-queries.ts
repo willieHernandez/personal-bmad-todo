@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProjects, getNodeChildren, getNode, createNode, updateNode, deleteNode, reorderNode, moveNode } from '../api/nodes.api'
-import type { CreateNode, MoveNode, NodeResponse } from '@todo-bmad-style/shared'
+import type { CreateNode, MoveNode, NodeResponse, UpdateNode } from '@todo-bmad-style/shared'
 
 export function useProjects() {
   return useQuery({
@@ -41,7 +41,7 @@ export function useCreateProject() {
 export function useUpdateNode() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { title: string }; parentId: string | null }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateNode; parentId: string | null }) =>
       updateNode(id, data),
     onMutate: async ({ id, data, parentId }) => {
       const queryKey = ['nodes', parentId, 'children'] as const

@@ -23,6 +23,16 @@ vi.mock('#/queries/node-queries', () => ({
     isLoading: false,
     error: null,
   }),
+  useUpdateNode: () => ({
+    mutate: vi.fn(),
+  }),
+}))
+
+vi.mock('#/hooks/use-auto-save', () => ({
+  useAutoSave: () => ({
+    error: null,
+    flush: vi.fn(),
+  }),
 }))
 
 function createWrapper() {
