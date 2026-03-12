@@ -34,6 +34,7 @@ RUN pnpm install --prod --frozen-lockfile
 
 COPY --from=build /app/packages/server/dist/ packages/server/dist/
 COPY --from=build /app/packages/shared/dist/ packages/shared/dist/
+# drizzle-kit push needs these TS sources at runtime (parsed via tsx, both in prod deps)
 COPY packages/server/drizzle.config.ts packages/server/
 COPY packages/server/src/db/schema.ts packages/server/src/db/
 COPY --chmod=755 packages/server/docker-entrypoint.sh packages/server/

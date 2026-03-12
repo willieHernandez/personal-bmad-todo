@@ -6,10 +6,13 @@ db_has_schema() {
   if [ ! -f "$DB_PATH" ]; then
     return 1
   fi
-  node -e "
+  # --input-type=commonjs required: package.json has "type":"module" so Node
+  # defaults to ESM, but this inline script uses require() for better-sqlite3.
+  node --input-type=commonjs -e "
     const Database = require('better-sqlite3');
     const db = new Database(process.env.DB_PATH);
     const row = db.prepare(\"SELECT name FROM sqlite_master WHERE type='table' AND name='nodes'\").get();
+    db.close();
     process.exit(row ? 0 : 1);
   "
 }
