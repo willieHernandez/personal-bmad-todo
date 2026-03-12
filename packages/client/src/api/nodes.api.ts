@@ -9,6 +9,10 @@ export function getNodeChildren(parentId: string): Promise<NodeResponse[]> {
   return apiClient<NodeResponse[]>(`/nodes/${parentId}/children`)
 }
 
+export function getNode(id: string): Promise<NodeResponse> {
+  return apiClient<NodeResponse>(`/nodes/${id}`)
+}
+
 // sortOrder is included for optimistic update ordering; server computes final sort order
 export function createNode(data: CreateNode & { sortOrder?: number }): Promise<NodeResponse> {
   return apiClient<NodeResponse>('/nodes', {

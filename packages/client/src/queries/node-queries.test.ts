@@ -7,6 +7,7 @@ import type { NodeResponse } from '@todo-bmad-style/shared'
 vi.mock('../api/nodes.api', () => ({
   getProjects: vi.fn(),
   getNodeChildren: vi.fn(),
+  getNode: vi.fn(),
   createNode: vi.fn(),
   updateNode: vi.fn(),
   deleteNode: vi.fn(),
@@ -14,9 +15,10 @@ vi.mock('../api/nodes.api', () => ({
   moveNode: vi.fn(),
 }))
 
-import { useUpdateNode, useDeleteNode, useReorderNode, useMoveNode } from './node-queries'
-import { updateNode, deleteNode, reorderNode, moveNode } from '../api/nodes.api'
+import { useNode, useUpdateNode, useDeleteNode, useReorderNode, useMoveNode } from './node-queries'
+import { getNode, updateNode, deleteNode, reorderNode, moveNode } from '../api/nodes.api'
 
+const mockGetNode = vi.mocked(getNode)
 const mockUpdateNode = vi.mocked(updateNode)
 const mockDeleteNode = vi.mocked(deleteNode)
 const mockReorderNode = vi.mocked(reorderNode)
@@ -47,6 +49,34 @@ function createWrapper() {
       createElement(QueryClientProvider, { client: queryClient }, children),
   }
 }
+
+describe('useNode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('fetches a single node by id', async () => {
+    const node = makeNode({ id: 'node-1', title: 'Fetched Node' })
+    mockGetNode.mockResolvedValueOnce(node)
+
+    const { wrapper } = createWrapper()
+    const { result } = renderHook(() => useNode('node-1'), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+
+    expect(result.current.data).toEqual(node)
+    expect(mockGetNode).toHaveBeenCalledWith('node-1')
+  })
+
+  it('does not fetch when nodeId is empty', () => {
+    const { wrapper } = createWrapper()
+    renderHook(() => useNode(''), { wrapper })
+
+    expect(mockGetNode).not.toHaveBeenCalled()
+  })
+})
 
 describe('useUpdateNode', () => {
   beforeEach(() => {

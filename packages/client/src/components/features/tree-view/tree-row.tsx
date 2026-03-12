@@ -134,7 +134,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
       <button
         ref={setDragNodeRef}
         type="button"
-        className="tree-row-drag-handle flex h-4 w-4 shrink-0 cursor-grab items-center justify-center opacity-0 transition-opacity active:cursor-grabbing focus-visible:opacity-100"
+        className="tree-row-drag-handle flex h-4 w-4 shrink-0 cursor-grab items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing focus-visible:opacity-100"
         aria-label="Drag to reorder"
         data-testid="tree-row-drag-handle"
         {...listeners}

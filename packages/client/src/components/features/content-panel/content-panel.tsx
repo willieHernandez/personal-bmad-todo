@@ -1,13 +1,27 @@
+import { useCallback, useRef } from 'react'
 import { Plus } from 'lucide-react'
 import { useUIStore } from '#/stores/ui-store'
 import { useProjects, useCreateProject } from '#/queries/node-queries'
 import { TreeView } from '#/components/features/tree-view/tree-view'
+import { DetailPanel } from '#/components/features/detail-panel/detail-panel'
 
 export function ContentPanel() {
+  const treeContainerRef = useRef<HTMLDivElement>(null)
   const activeProjectId = useUIStore((s) => s.activeProjectId)
   const setActiveProject = useUIStore((s) => s.setActiveProject)
   const { data: projects } = useProjects()
   const createProject = useCreateProject()
+
+  const handleDetailPanelClose = useCallback(() => {
+    const focusedRow = treeContainerRef.current?.querySelector<HTMLElement>(
+      '[role="treeitem"][tabindex="0"]'
+    )
+    if (focusedRow) {
+      focusedRow.focus()
+    } else {
+      treeContainerRef.current?.querySelector<HTMLElement>('[role="tree"]')?.focus()
+    }
+  }, [])
 
   const activeProject = projects?.find((p) => p.id === activeProjectId)
 
@@ -39,8 +53,11 @@ export function ContentPanel() {
   }
 
   return (
-    <div className="flex h-full flex-1 flex-col overflow-hidden bg-app-bg">
-      <TreeView projectId={activeProjectId} />
+    <div className="flex h-full flex-1 overflow-hidden bg-app-bg">
+      <div ref={treeContainerRef} className="flex-1 overflow-hidden">
+        <TreeView projectId={activeProjectId} />
+      </div>
+      <DetailPanel onClose={handleDetailPanelClose} />
     </div>
   )
 }

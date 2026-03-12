@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProjects, getNodeChildren, createNode, updateNode, deleteNode, reorderNode, moveNode } from '../api/nodes.api'
+import { getProjects, getNodeChildren, getNode, createNode, updateNode, deleteNode, reorderNode, moveNode } from '../api/nodes.api'
 import type { CreateNode, MoveNode, NodeResponse } from '@todo-bmad-style/shared'
 
 export function useProjects() {
@@ -14,6 +14,15 @@ export function useNodeChildren(parentId: string | null) {
     queryKey: ['nodes', parentId, 'children'],
     queryFn: () => getNodeChildren(parentId!),
     enabled: !!parentId,
+  })
+}
+
+export function useNode(nodeId: string) {
+  return useQuery({
+    queryKey: ['nodes', nodeId, 'detail'],
+    queryFn: () => getNode(nodeId),
+    enabled: !!nodeId,
+    retry: false,
   })
 }
 
@@ -41,16 +50,26 @@ export function useUpdateNode() {
       queryClient.setQueryData<NodeResponse[]>(queryKey, (old) =>
         old?.map((n) => (n.id === id ? { ...n, ...data } : n))
       )
-      return { previous, queryKey }
+      // Optimistically update the detail query so the tab title updates instantly
+      const detailKey = ['nodes', id, 'detail'] as const
+      const previousDetail = queryClient.getQueryData<NodeResponse>(detailKey)
+      if (previousDetail) {
+        queryClient.setQueryData<NodeResponse>(detailKey, { ...previousDetail, ...data })
+      }
+      return { previous, queryKey, previousDetail, detailKey }
     },
     onError: (_err, _vars, context) => {
       if (context) {
         queryClient.setQueryData(context.queryKey, context.previous)
+        if (context.previousDetail) {
+          queryClient.setQueryData(context.detailKey, context.previousDetail)
+        }
       }
     },
     onSettled: (_data, _err, _vars, context) => {
       if (context) {
         queryClient.invalidateQueries({ queryKey: context.queryKey })
+        queryClient.invalidateQueries({ queryKey: context.detailKey })
       }
     },
   })
