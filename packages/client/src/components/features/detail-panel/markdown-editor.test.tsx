@@ -14,6 +14,9 @@ vi.mock('#/queries/node-queries', () => ({
     mutate: vi.fn(),
     mutateAsync: vi.fn(),
   }),
+  useToggleNodeCompletion: () => ({
+    mutate: vi.fn(),
+  }),
 }))
 
 afterEach(() => {

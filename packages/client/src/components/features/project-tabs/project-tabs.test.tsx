@@ -32,6 +32,7 @@ const mockProjects = [
 vi.mock('#/queries/node-queries', () => ({
   useProjects: () => ({ data: mockProjects, isLoading: false }),
   useCreateProject: () => ({ mutate: vi.fn() }),
+  useToggleNodeCompletion: () => ({ mutate: vi.fn() }),
 }))
 
 function renderWithProviders(ui: React.ReactElement) {

@@ -44,6 +44,11 @@ export function DetailContent({ nodeId }: DetailContentProps) {
       onScroll={handleScroll}
     >
       <BreadcrumbNav nodeId={nodeId} />
+      {node.isCompleted && (
+        <div className="mb-2 text-sm text-app-text-secondary line-through motion-safe:transition-opacity motion-safe:duration-200" data-testid="detail-completed-indicator">
+          {node.title} — Completed
+        </div>
+      )}
       <MarkdownEditor
         nodeId={nodeId}
         parentId={node.parentId}

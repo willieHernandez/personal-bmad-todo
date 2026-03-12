@@ -18,6 +18,7 @@ import {
   deleteNode,
   reorderNode,
   moveNode,
+  toggleNodeCompletion,
   NotFoundError,
   HierarchyError,
 } from '../services/node.service.js';
@@ -104,6 +105,25 @@ export default async function nodesRoutes(app: FastifyInstance) {
     try {
       await deleteNode(request.params.id);
       return reply.status(204).send();
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({
+          statusCode: 404,
+          error: 'Not Found',
+          message: err.message,
+        });
+      }
+      throw err;
+    }
+  });
+
+  // POST /api/nodes/:id/complete — toggle completion status with cascade
+  fastify.post(`${API_ROUTES.NODES}/:id/complete`, {
+    schema: { params: idParamSchema },
+  }, async (request, reply) => {
+    try {
+      const result = await toggleNodeCompletion(request.params.id);
+      return reply.send(result);
     } catch (err) {
       if (err instanceof NotFoundError) {
         return reply.status(404).send({

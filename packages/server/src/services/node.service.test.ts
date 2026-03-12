@@ -16,6 +16,7 @@ import {
   deleteNode,
   reorderNode,
   moveNode,
+  toggleNodeCompletion,
   NotFoundError,
   HierarchyError,
 } from './node.service.js';
@@ -338,6 +339,136 @@ describe('node.service', () => {
       expect(p2Children).toHaveLength(2);
       expect(p2Children[0].sortOrder).toBe(0);
       expect(p2Children[1].sortOrder).toBe(1);
+    });
+  });
+
+  describe('toggleNodeCompletion', () => {
+    it('should toggle a single node with no children', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+
+      const result = await toggleNodeCompletion(project.id);
+      expect(result.affectedNodes).toHaveLength(1);
+      expect(result.affectedNodes[0]).toEqual({ id: project.id, isCompleted: true });
+
+      const updated = await getNodeById(project.id);
+      expect(updated.isCompleted).toBe(true);
+    });
+
+    it('should reopen a completed node', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      await toggleNodeCompletion(project.id); // complete
+
+      const result = await toggleNodeCompletion(project.id); // reopen
+      expect(result.affectedNodes).toHaveLength(1);
+      expect(result.affectedNodes[0]).toEqual({ id: project.id, isCompleted: false });
+    });
+
+    it('should cascade up when all children complete', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
+      const t1 = await createNode({ title: 'T1', type: 'task', parentId: effort.id });
+      const t2 = await createNode({ title: 'T2', type: 'task', parentId: effort.id });
+      const t3 = await createNode({ title: 'T3', type: 'task', parentId: effort.id });
+
+      await toggleNodeCompletion(t1.id);
+      await toggleNodeCompletion(t2.id);
+
+      // Complete last task — effort auto-completes, then project (sole child) auto-completes
+      const result = await toggleNodeCompletion(t3.id);
+      expect(result.affectedNodes).toHaveLength(3);
+      expect(result.affectedNodes[0]).toEqual({ id: t3.id, isCompleted: true });
+      expect(result.affectedNodes[1]).toEqual({ id: effort.id, isCompleted: true });
+      expect(result.affectedNodes[2]).toEqual({ id: project.id, isCompleted: true });
+
+      const updatedEffort = await getNodeById(effort.id);
+      expect(updatedEffort.isCompleted).toBe(true);
+    });
+
+    it('should cascade up multi-level when all descendants complete', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
+      const task = await createNode({ title: 'Task', type: 'task', parentId: effort.id });
+      const s1 = await createNode({ title: 'S1', type: 'subtask', parentId: task.id });
+      const s2 = await createNode({ title: 'S2', type: 'subtask', parentId: task.id });
+
+      await toggleNodeCompletion(s1.id);
+
+      // Complete last subtask — task, effort, project should all cascade
+      const result = await toggleNodeCompletion(s2.id);
+      expect(result.affectedNodes).toHaveLength(4);
+      expect(result.affectedNodes.map((n) => n.id)).toEqual([s2.id, task.id, effort.id, project.id]);
+      expect(result.affectedNodes.every((n) => n.isCompleted)).toBe(true);
+    });
+
+    it('should cascade reopen when child reopened', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
+      const t1 = await createNode({ title: 'T1', type: 'task', parentId: effort.id });
+      const t2 = await createNode({ title: 'T2', type: 'task', parentId: effort.id });
+
+      // Complete all to auto-complete effort
+      await toggleNodeCompletion(t1.id);
+      await toggleNodeCompletion(t2.id);
+      expect((await getNodeById(effort.id)).isCompleted).toBe(true);
+
+      // Reopen one child — effort and project should reopen (cascade up)
+      const result = await toggleNodeCompletion(t1.id);
+      expect(result.affectedNodes).toHaveLength(3);
+      expect(result.affectedNodes[0]).toEqual({ id: t1.id, isCompleted: false });
+      expect(result.affectedNodes[1]).toEqual({ id: effort.id, isCompleted: false });
+      expect(result.affectedNodes[2]).toEqual({ id: project.id, isCompleted: false });
+    });
+
+    it('should cascade reopen multi-level', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
+      const task = await createNode({ title: 'Task', type: 'task', parentId: effort.id });
+      const subtask = await createNode({ title: 'Subtask', type: 'subtask', parentId: task.id });
+
+      // Complete subtask → cascades all the way up
+      await toggleNodeCompletion(subtask.id);
+      expect((await getNodeById(project.id)).isCompleted).toBe(true);
+
+      // Reopen subtask → cascades reopen all the way up
+      const result = await toggleNodeCompletion(subtask.id);
+      expect(result.affectedNodes).toHaveLength(4);
+      expect(result.affectedNodes.every((n) => !n.isCompleted)).toBe(true);
+    });
+
+    it('should retain children state when parent directly reopened', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
+      const t1 = await createNode({ title: 'T1', type: 'task', parentId: effort.id });
+      const t2 = await createNode({ title: 'T2', type: 'task', parentId: effort.id });
+
+      // Complete all children → effort auto-completes
+      await toggleNodeCompletion(t1.id);
+      await toggleNodeCompletion(t2.id);
+
+      // Reopen effort directly — children should stay completed
+      await toggleNodeCompletion(effort.id);
+      expect((await getNodeById(effort.id)).isCompleted).toBe(false);
+      expect((await getNodeById(t1.id)).isCompleted).toBe(true);
+      expect((await getNodeById(t2.id)).isCompleted).toBe(true);
+    });
+
+    it('should not cascade when siblings still incomplete', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
+      const t1 = await createNode({ title: 'T1', type: 'task', parentId: effort.id });
+      await createNode({ title: 'T2', type: 'task', parentId: effort.id });
+      await createNode({ title: 'T3', type: 'task', parentId: effort.id });
+
+      // Complete one of three — effort should NOT complete
+      const result = await toggleNodeCompletion(t1.id);
+      expect(result.affectedNodes).toHaveLength(1);
+      expect((await getNodeById(effort.id)).isCompleted).toBe(false);
+    });
+
+    it('should throw NotFoundError for non-existent node', async () => {
+      await expect(
+        toggleNodeCompletion('00000000-0000-0000-0000-000000000000')
+      ).rejects.toThrow(NotFoundError);
     });
   });
 });

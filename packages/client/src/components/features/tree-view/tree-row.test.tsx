@@ -25,6 +25,7 @@ afterEach(() => {
 
 const defaultProps = {
   onToggleExpand: vi.fn(),
+  onToggleComplete: vi.fn(),
   onEditChange: vi.fn(),
   onEditCommit: vi.fn(),
   onEditCancel: vi.fn(),
@@ -308,5 +309,117 @@ describe('TreeRow', () => {
     )
     const row = container.querySelector('[role="treeitem"]')
     expect(row?.className).toContain('bg-[#EFF6FF]')
+  })
+
+  it('renders checkbox for each tree item', () => {
+    renderWithDnd(
+      <TreeRow
+        node={makeNode()}
+        depth={0}
+        isExpanded={false}
+        hasChildren={false}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        {...defaultProps}
+      />
+    )
+    const checkbox = screen.getByTestId('tree-row-checkbox') as HTMLInputElement
+    expect(checkbox).toBeDefined()
+    expect(checkbox.type).toBe('checkbox')
+  })
+
+  it('checkbox reflects isCompleted state', () => {
+    renderWithDnd(
+      <TreeRow
+        node={makeNode({ isCompleted: true })}
+        depth={0}
+        isExpanded={false}
+        hasChildren={false}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        {...defaultProps}
+      />
+    )
+    const checkbox = screen.getByTestId('tree-row-checkbox') as HTMLInputElement
+    expect(checkbox.checked).toBe(true)
+  })
+
+  it('calls onToggleComplete when checkbox is clicked', () => {
+    const onToggleComplete = vi.fn()
+    renderWithDnd(
+      <TreeRow
+        node={makeNode({ id: 'node-1' })}
+        depth={0}
+        isExpanded={false}
+        hasChildren={false}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        {...defaultProps}
+        onToggleComplete={onToggleComplete}
+      />
+    )
+    const checkbox = screen.getByTestId('tree-row-checkbox')
+    fireEvent.click(checkbox)
+    expect(onToggleComplete).toHaveBeenCalledWith('node-1')
+  })
+
+  it('checkbox click does NOT trigger node selection', () => {
+    const handleClick = vi.fn()
+    const { container } = renderWithDnd(
+      <div onClick={handleClick}>
+        <TreeRow
+          node={makeNode()}
+          depth={0}
+          isExpanded={false}
+          hasChildren={false}
+          isFocused={false}
+          isEditing={false}
+          editValue=""
+          {...defaultProps}
+        />
+      </div>
+    )
+    const checkbox = container.querySelector('[data-testid="tree-row-checkbox"]')!
+    fireEvent.click(checkbox)
+    // The click should be stopped by stopPropagation
+    expect(handleClick).not.toHaveBeenCalled()
+  })
+
+  it('shows strikethrough class when node is completed', () => {
+    renderWithDnd(
+      <TreeRow
+        node={makeNode({ isCompleted: true, title: 'Done Task' })}
+        depth={0}
+        isExpanded={false}
+        hasChildren={false}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        {...defaultProps}
+      />
+    )
+    const titleSpan = screen.getByText('Done Task')
+    expect(titleSpan.className).toContain('line-through')
+    expect(titleSpan.className).toContain('text-app-text-secondary')
+  })
+
+  it('sets correct aria-label on checkbox based on completion state', () => {
+    renderWithDnd(
+      <TreeRow
+        node={makeNode({ title: 'My Task', isCompleted: false })}
+        depth={0}
+        isExpanded={false}
+        hasChildren={false}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        {...defaultProps}
+      />
+    )
+    const checkbox = screen.getByTestId('tree-row-checkbox')
+    expect(checkbox.getAttribute('aria-label')).toBe('Mark My Task as complete')
   })
 })

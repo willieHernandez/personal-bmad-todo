@@ -16,6 +16,7 @@ interface TreeRowProps {
   isDragging?: boolean
   isDropTarget?: boolean
   onToggleExpand: (nodeId: string) => void
+  onToggleComplete: (nodeId: string) => void
   onEditChange: (value: string) => void
   onEditCommit: () => void
   onEditCancel: () => void
@@ -37,6 +38,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
     isDragging,
     isDropTarget,
     onToggleExpand,
+    onToggleComplete,
     onEditChange,
     onEditCommit,
     onEditCancel,
@@ -144,6 +146,21 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
         <GripVertical className="h-3 w-3 text-app-text-secondary" />
       </button>
 
+      {/* Completion checkbox */}
+      <input
+        type="checkbox"
+        checked={node.isCompleted}
+        onChange={(e) => {
+          e.stopPropagation()
+          onToggleComplete(node.id)
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-app-accent"
+        aria-label={node.isCompleted ? `Mark ${node.title} as incomplete` : `Mark ${node.title} as complete`}
+        data-testid="tree-row-checkbox"
+        tabIndex={-1}
+      />
+
       {/* Chevron / Dash indicator */}
       <button
         type="button"
@@ -184,7 +201,10 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
         />
       ) : (
         <>
-          <span className="ml-1 flex-1 truncate">{node.title}</span>
+          <span className={cn(
+            'ml-1 flex-1 truncate motion-safe:transition-opacity motion-safe:duration-200',
+            node.isCompleted && 'line-through text-app-text-secondary'
+          )}>{node.title}</span>
           {onDelete && (
             <button
               type="button"

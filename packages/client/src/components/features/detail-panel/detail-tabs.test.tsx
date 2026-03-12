@@ -31,6 +31,9 @@ vi.mock('#/queries/node-queries', () => ({
     isLoading: false,
     error: null,
   }),
+  useToggleNodeCompletion: () => ({
+    mutate: vi.fn(),
+  }),
 }))
 
 function createWrapper() {

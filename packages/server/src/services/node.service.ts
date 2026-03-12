@@ -284,6 +284,54 @@ export async function getNodeAncestors(id: string) {
   return ancestors;
 }
 
+export async function toggleNodeCompletion(id: string) {
+  const node = await getNodeById(id);
+  const newState = !node.isCompleted;
+  const now = new Date().toISOString();
+  const affectedNodes: Array<{ id: string; isCompleted: boolean }> = [];
+
+  db.run(sql`BEGIN IMMEDIATE`);
+  try {
+    // Update the toggled node
+    await db.update(nodes).set({ isCompleted: newState, updatedAt: now }).where(eq(nodes.id, id));
+    affectedNodes.push({ id, isCompleted: newState });
+
+    // Cascade up — track the last affected child so the sibling check
+    // is correct at every cascade level, not just the first
+    let lastAffectedChildId = id;
+    let currentParentId = node.parentId;
+    while (currentParentId) {
+      const parent = await getNodeById(currentParentId);
+
+      if (newState) {
+        // Completing: check if all children of this parent are now complete
+        const children = await getChildren(currentParentId);
+        const allComplete = children.every((c) => c.id === lastAffectedChildId ? true : c.isCompleted);
+        if (!allComplete) break;
+
+        await db.update(nodes).set({ isCompleted: true, updatedAt: now }).where(eq(nodes.id, currentParentId));
+        affectedNodes.push({ id: currentParentId, isCompleted: true });
+      } else {
+        // Reopening: if parent was completed, reopen it
+        if (!parent.isCompleted) break;
+
+        await db.update(nodes).set({ isCompleted: false, updatedAt: now }).where(eq(nodes.id, currentParentId));
+        affectedNodes.push({ id: currentParentId, isCompleted: false });
+      }
+
+      lastAffectedChildId = currentParentId;
+      currentParentId = parent.parentId;
+    }
+
+    db.run(sql`COMMIT`);
+  } catch (e) {
+    db.run(sql`ROLLBACK`);
+    throw e;
+  }
+
+  return { affectedNodes };
+}
+
 async function reindexChildren(parentId: string) {
   const children = await db
     .select()
