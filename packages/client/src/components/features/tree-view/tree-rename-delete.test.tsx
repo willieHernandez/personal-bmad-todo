@@ -86,6 +86,12 @@ vi.mock('#/queries/node-queries', () => ({
   useDeleteNode: () => ({
     mutate: mockDeleteMutate,
   }),
+  useReorderNode: () => ({
+    mutate: vi.fn(),
+  }),
+  useMoveNode: () => ({
+    mutate: vi.fn(),
+  }),
 }))
 
 vi.mock('@tanstack/react-virtual', () => ({

@@ -223,3 +223,8 @@ body {
 [role="treeitem"]:hover .tree-row-delete {
   opacity: 1;
 }
+
+/* Tree row drag handle: show on row hover */
+[role="treeitem"]:hover .tree-row-drag-handle {
+  opacity: 1;
+}

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProjects, getNodeChildren, createNode, updateNode, deleteNode } from '../api/nodes.api'
-import type { CreateNode, NodeResponse } from '@todo-bmad-style/shared'
+import { getProjects, getNodeChildren, createNode, updateNode, deleteNode, reorderNode, moveNode } from '../api/nodes.api'
+import type { CreateNode, MoveNode, NodeResponse } from '@todo-bmad-style/shared'
 
 export function useProjects() {
   return useQuery({
@@ -129,6 +129,78 @@ export function useCreateNode() {
       queryClient.invalidateQueries({
         queryKey: ['nodes', parentId, 'children'],
       })
+    },
+  })
+}
+
+export function useReorderNode() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, sortOrder }: { id: string; parentId: string | null; sortOrder: number }) =>
+      reorderNode(id, { sortOrder }),
+    onMutate: async ({ id, parentId, sortOrder }) => {
+      const queryKey = ['nodes', parentId, 'children'] as const
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<NodeResponse[]>(queryKey)
+      queryClient.setQueryData<NodeResponse[]>(queryKey, (old) => {
+        if (!old) return old
+        const items = [...old]
+        const currentIndex = items.findIndex((n) => n.id === id)
+        if (currentIndex < 0) return old
+        const [moved] = items.splice(currentIndex, 1)
+        items.splice(sortOrder, 0, moved)
+        return items.map((item, i) => ({ ...item, sortOrder: i }))
+      })
+      return { previous, queryKey }
+    },
+    onError: (_err, _vars, context) => {
+      if (context) queryClient.setQueryData(context.queryKey, context.previous)
+    },
+    onSettled: (_data, _err, _vars, context) => {
+      if (context) queryClient.invalidateQueries({ queryKey: context.queryKey })
+    },
+  })
+}
+
+export function useMoveNode() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; oldParentId: string | null; data: MoveNode }) =>
+      moveNode(id, data),
+    onMutate: async ({ id, oldParentId, data }) => {
+      const oldKey = ['nodes', oldParentId, 'children'] as const
+      const newKey = ['nodes', data.newParentId, 'children'] as const
+      await queryClient.cancelQueries({ queryKey: oldKey })
+      await queryClient.cancelQueries({ queryKey: newKey })
+      const previousOld = queryClient.getQueryData<NodeResponse[]>(oldKey)
+      const previousNew = queryClient.getQueryData<NodeResponse[]>(newKey)
+      // Remove from old parent
+      queryClient.setQueryData<NodeResponse[]>(oldKey, (old) =>
+        old?.filter((n) => n.id !== id).map((n, i) => ({ ...n, sortOrder: i }))
+      )
+      // Add to new parent
+      queryClient.setQueryData<NodeResponse[]>(newKey, (old) => {
+        const items = old ? [...old] : []
+        const movedNode = previousOld?.find((n) => n.id === id)
+        if (!movedNode) return old
+        const updated = { ...movedNode, parentId: data.newParentId, sortOrder: data.sortOrder }
+        if (data.newType) updated.type = data.newType
+        items.splice(data.sortOrder, 0, updated)
+        return items.map((n, i) => ({ ...n, sortOrder: i }))
+      })
+      return { previousOld, previousNew, oldKey, newKey }
+    },
+    onError: (_err, _vars, context) => {
+      if (context) {
+        queryClient.setQueryData(context.oldKey, context.previousOld)
+        queryClient.setQueryData(context.newKey, context.previousNew)
+      }
+    },
+    onSettled: (_data, _err, _vars, context) => {
+      if (context) {
+        queryClient.invalidateQueries({ queryKey: context.oldKey })
+        queryClient.invalidateQueries({ queryKey: context.newKey })
+      }
     },
   })
 }

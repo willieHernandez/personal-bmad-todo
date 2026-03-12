@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { DndContext } from '@dnd-kit/core'
 import { TreeRow } from './tree-row'
 import type { NodeResponse } from '@todo-bmad-style/shared'
 
@@ -29,9 +30,19 @@ const defaultProps = {
   onEditCancel: vi.fn(),
 }
 
+function renderWithDnd(ui: React.ReactElement) {
+  return render(<DndContext>{ui}</DndContext>)
+}
+
+function getChevronButton(container: HTMLElement): HTMLButtonElement {
+  // The chevron/expand button is the second button (after drag handle)
+  const buttons = container.querySelectorAll('button')
+  return buttons[1] as HTMLButtonElement
+}
+
 describe('TreeRow', () => {
   it('renders node title', () => {
-    render(
+    renderWithDnd(
       <TreeRow
         node={makeNode({ title: 'My Effort' })}
         depth={0}
@@ -47,7 +58,7 @@ describe('TreeRow', () => {
   })
 
   it('renders with correct depth indentation', () => {
-    const { container } = render(
+    const { container } = renderWithDnd(
       <TreeRow
         node={makeNode()}
         depth={2}
@@ -64,7 +75,7 @@ describe('TreeRow', () => {
   })
 
   it('hides chevron for subtask nodes with no children', () => {
-    const { container } = render(
+    const { container } = renderWithDnd(
       <TreeRow
         node={makeNode({ type: 'subtask' })}
         depth={0}
@@ -76,12 +87,12 @@ describe('TreeRow', () => {
         {...defaultProps}
       />
     )
-    const chevronBtn = container.querySelector('button')
+    const chevronBtn = getChevronButton(container)
     expect(chevronBtn?.className).toContain('invisible')
   })
 
   it('shows dash icon for expandable nodes with no children', () => {
-    render(
+    renderWithDnd(
       <TreeRow
         node={makeNode({ type: 'effort' })}
         depth={0}
@@ -98,7 +109,7 @@ describe('TreeRow', () => {
   })
 
   it('shows chevron when node has children', () => {
-    const { container } = render(
+    const { container } = renderWithDnd(
       <TreeRow
         node={makeNode()}
         depth={0}
@@ -110,12 +121,12 @@ describe('TreeRow', () => {
         {...defaultProps}
       />
     )
-    const chevronBtn = container.querySelector('button')
+    const chevronBtn = getChevronButton(container)
     expect(chevronBtn?.className).not.toContain('invisible')
   })
 
   it('sets correct ARIA attributes', () => {
-    const { container } = render(
+    const { container } = renderWithDnd(
       <TreeRow
         node={makeNode()}
         depth={1}
@@ -135,7 +146,7 @@ describe('TreeRow', () => {
   })
 
   it('does not set aria-expanded when no children', () => {
-    const { container } = render(
+    const { container } = renderWithDnd(
       <TreeRow
         node={makeNode()}
         depth={0}
@@ -152,7 +163,7 @@ describe('TreeRow', () => {
   })
 
   it('renders input in edit mode', () => {
-    render(
+    renderWithDnd(
       <TreeRow
         node={makeNode()}
         depth={0}
@@ -170,7 +181,7 @@ describe('TreeRow', () => {
 
   it('calls onEditCommit on Enter in edit mode', () => {
     const onEditCommit = vi.fn()
-    render(
+    renderWithDnd(
       <TreeRow
         node={makeNode()}
         depth={0}
@@ -190,7 +201,7 @@ describe('TreeRow', () => {
 
   it('calls onEditCancel on Escape in edit mode', () => {
     const onEditCancel = vi.fn()
-    render(
+    renderWithDnd(
       <TreeRow
         node={makeNode()}
         depth={0}
@@ -210,7 +221,7 @@ describe('TreeRow', () => {
 
   it('calls onToggleExpand when chevron is clicked', () => {
     const onToggleExpand = vi.fn()
-    const { container } = render(
+    const { container } = renderWithDnd(
       <TreeRow
         node={makeNode({ id: 'e1' })}
         depth={0}
@@ -223,13 +234,13 @@ describe('TreeRow', () => {
         onToggleExpand={onToggleExpand}
       />
     )
-    const chevronBtn = container.querySelector('button')!
+    const chevronBtn = getChevronButton(container)
     fireEvent.click(chevronBtn)
     expect(onToggleExpand).toHaveBeenCalledWith('e1')
   })
 
   it('sets tabIndex -1 when not focused', () => {
-    const { container } = render(
+    const { container } = renderWithDnd(
       <TreeRow
         node={makeNode()}
         depth={0}
@@ -243,5 +254,59 @@ describe('TreeRow', () => {
     )
     const row = container.querySelector('[role="treeitem"]')
     expect(row?.getAttribute('tabindex')).toBe('-1')
+  })
+
+  it('renders drag handle', () => {
+    renderWithDnd(
+      <TreeRow
+        node={makeNode()}
+        depth={0}
+        isExpanded={false}
+        hasChildren={false}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        {...defaultProps}
+      />
+    )
+    const dragHandle = screen.getByTestId('tree-row-drag-handle')
+    expect(dragHandle).toBeDefined()
+    expect(dragHandle.getAttribute('aria-label')).toBe('Drag to reorder')
+  })
+
+  it('applies isDragging styles when being dragged', () => {
+    const { container } = renderWithDnd(
+      <TreeRow
+        node={makeNode()}
+        depth={0}
+        isExpanded={false}
+        hasChildren={false}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        isDragging={true}
+        {...defaultProps}
+      />
+    )
+    const row = container.querySelector('[role="treeitem"]')
+    expect(row?.className).toContain('opacity-40')
+  })
+
+  it('applies drop target styles when isDropTarget', () => {
+    const { container } = renderWithDnd(
+      <TreeRow
+        node={makeNode()}
+        depth={0}
+        isExpanded={false}
+        hasChildren={false}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        isDropTarget={true}
+        {...defaultProps}
+      />
+    )
+    const row = container.querySelector('[role="treeitem"]')
+    expect(row?.className).toContain('bg-[#EFF6FF]')
   })
 })
