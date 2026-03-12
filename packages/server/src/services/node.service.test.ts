@@ -10,6 +10,7 @@ import {
   getProjects,
   getNodeById,
   getChildren,
+  getNodeAncestors,
   createNode,
   updateNode,
   deleteNode,
@@ -259,6 +260,35 @@ describe('node.service', () => {
       expect(children[0].sortOrder).toBe(0);
       expect(children[1].sortOrder).toBe(1);
       expect(children[2].sortOrder).toBe(2);
+    });
+  });
+
+  describe('getNodeAncestors', () => {
+    it('should return single-item array for project nodes', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const ancestors = await getNodeAncestors(project.id);
+      expect(ancestors).toHaveLength(1);
+      expect(ancestors[0].id).toBe(project.id);
+    });
+
+    it('should return full ancestor chain from root to node', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
+      const task = await createNode({ title: 'Task', type: 'task', parentId: effort.id });
+      const subtask = await createNode({ title: 'Subtask', type: 'subtask', parentId: task.id });
+
+      const ancestors = await getNodeAncestors(subtask.id);
+      expect(ancestors).toHaveLength(4);
+      expect(ancestors[0].id).toBe(project.id);
+      expect(ancestors[1].id).toBe(effort.id);
+      expect(ancestors[2].id).toBe(task.id);
+      expect(ancestors[3].id).toBe(subtask.id);
+    });
+
+    it('should return 404 for non-existent node', async () => {
+      await expect(
+        getNodeAncestors('00000000-0000-0000-0000-000000000000')
+      ).rejects.toThrow(NotFoundError);
     });
   });
 

@@ -1,24 +1,11 @@
 import { useRef, useEffect, useCallback } from 'react'
-import { cn } from '#/lib/utils'
 import { useNode } from '#/queries/node-queries'
 import { useDetailPanelStore } from '#/stores/detail-panel-store'
 import { MarkdownEditor } from './markdown-editor'
+import { BreadcrumbNav } from './breadcrumb-nav'
 
 interface DetailContentProps {
   nodeId: string
-}
-
-function TypeBadge({ type }: { type: string }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider',
-        'border border-app-border bg-app-surface text-app-text-secondary'
-      )}
-    >
-      {type}
-    </span>
-  )
 }
 
 export function DetailContent({ nodeId }: DetailContentProps) {
@@ -56,15 +43,7 @@ export function DetailContent({ nodeId }: DetailContentProps) {
       className="flex flex-1 flex-col overflow-y-auto p-4"
       onScroll={handleScroll}
     >
-      <div className="mb-4 flex items-center gap-2">
-        <h2 className="text-lg font-semibold text-app-text-primary">
-          {node.title}
-        </h2>
-        <TypeBadge type={node.type} />
-        {node.isCompleted && (
-          <span className="text-xs text-app-accent">Completed</span>
-        )}
-      </div>
+      <BreadcrumbNav nodeId={nodeId} />
       <MarkdownEditor
         nodeId={nodeId}
         parentId={node.parentId}

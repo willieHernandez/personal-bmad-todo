@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProjects, getNodeChildren, getNode, createNode, updateNode, deleteNode, reorderNode, moveNode } from '../api/nodes.api'
+import { getProjects, getNodeChildren, getNode, getNodeAncestors, createNode, updateNode, deleteNode, reorderNode, moveNode } from '../api/nodes.api'
 import type { CreateNode, MoveNode, NodeResponse, UpdateNode } from '@todo-bmad-style/shared'
 
 export function useProjects() {
@@ -23,6 +23,14 @@ export function useNode(nodeId: string) {
     queryFn: () => getNode(nodeId),
     enabled: !!nodeId,
     retry: false,
+  })
+}
+
+export function useNodeAncestors(nodeId: string | null) {
+  return useQuery({
+    queryKey: ['nodes', nodeId, 'ancestors'],
+    queryFn: () => getNodeAncestors(nodeId!),
+    enabled: !!nodeId,
   })
 }
 
@@ -70,6 +78,10 @@ export function useUpdateNode() {
       if (context) {
         queryClient.invalidateQueries({ queryKey: context.queryKey })
         queryClient.invalidateQueries({ queryKey: context.detailKey })
+        // Invalidate ancestor queries so breadcrumbs reflect renamed parents
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'nodes' && query.queryKey[2] === 'ancestors',
+        })
       }
     },
   })
@@ -98,6 +110,10 @@ export function useDeleteNode() {
       if (context) {
         queryClient.invalidateQueries({ queryKey: context.queryKey })
         queryClient.invalidateQueries({ queryKey: ['tree-state'] })
+        // Invalidate ancestor queries so breadcrumbs update after deletion
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'nodes' && query.queryKey[2] === 'ancestors',
+        })
       }
     },
   })
@@ -219,6 +235,10 @@ export function useMoveNode() {
       if (context) {
         queryClient.invalidateQueries({ queryKey: context.oldKey })
         queryClient.invalidateQueries({ queryKey: context.newKey })
+        // Invalidate ancestor queries so breadcrumbs update after move
+        queryClient.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'nodes' && query.queryKey[2] === 'ancestors',
+        })
       }
     },
   })

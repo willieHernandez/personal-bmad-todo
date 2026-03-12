@@ -17,6 +17,7 @@ import { useUIStore } from '#/stores/ui-store'
 import { useDetailPanelStore } from '#/stores/detail-panel-store'
 import { useUpdateNode, useDeleteNode, useReorderNode, useMoveNode } from '#/queries/node-queries'
 import { TreeRow } from './tree-row'
+import { InlineEffortMarkdown } from './inline-effort-markdown'
 import type { FlatTreeNode } from '#/hooks/use-tree-data'
 import type { NodeType } from '@todo-bmad-style/shared'
 
@@ -141,6 +142,8 @@ function computeNewType(targetParentType: string): NodeType | undefined {
   return VALID_CHILD_TYPES[targetParentType]
 }
 
+const TREE_ROW_HEIGHT = 28
+
 interface TreeViewProps {
   projectId: string
 }
@@ -243,7 +246,7 @@ export function TreeView({ projectId }: TreeViewProps) {
   const virtualizer = useVirtualizer({
     count: visibleNodes.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 28,
+    estimateSize: () => TREE_ROW_HEIGHT,
     overscan: 10,
   })
 
@@ -693,15 +696,20 @@ export function TreeView({ projectId }: TreeViewProps) {
             const showDropAfter = dropIndicator?.type === 'after' && dropIndicator.targetNodeId === flatNode.node.id
             const showDropChild = dropIndicator?.type === 'child' && dropIndicator.targetNodeId === flatNode.node.id
 
+            const showInlineMarkdown = flatNode.node.type === 'effort'
+              && flatNode.isExpanded
+              && !!flatNode.node.markdownBody?.trim()
+
             return (
               <div
                 key={flatNode.node.id}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
                 style={{
                   position: 'absolute',
                   top: 0,
                   left: 0,
                   transform: `translateY(${virtualRow.start}px)`,
-                  height: `${virtualRow.size}px`,
                   width: '100%',
                 }}
                 onClick={() => handleNodeClick(flatNode.node.id, virtualRow.index)}
@@ -755,9 +763,16 @@ export function TreeView({ projectId }: TreeViewProps) {
                 />
                 {showDropAfter && (
                   <div
-                    className="pointer-events-none absolute bottom-0 right-0 left-0 z-10 h-[2px] bg-[#3B82F6]"
-                    style={{ marginLeft: `${flatNode.depth * 16}px` }}
+                    className="pointer-events-none absolute right-0 left-0 z-10 h-[2px] bg-[#3B82F6]"
+                    style={{ marginLeft: `${flatNode.depth * 16}px`, bottom: showInlineMarkdown ? 'auto' : 0, top: showInlineMarkdown ? `${TREE_ROW_HEIGHT}px` : 'auto' }}
                     data-testid="drop-indicator-after"
+                  />
+                )}
+                {showInlineMarkdown && (
+                  <InlineEffortMarkdown
+                    markdownBody={flatNode.node.markdownBody}
+                    depth={flatNode.depth}
+                    title={flatNode.node.title}
                   />
                 )}
               </div>

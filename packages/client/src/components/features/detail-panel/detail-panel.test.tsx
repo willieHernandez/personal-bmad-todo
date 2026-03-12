@@ -23,6 +23,11 @@ vi.mock('#/queries/node-queries', () => ({
     isLoading: false,
     error: null,
   }),
+  useNodeAncestors: () => ({
+    data: undefined,
+    isLoading: false,
+    error: null,
+  }),
   useUpdateNode: () => ({
     mutate: vi.fn(),
   }),

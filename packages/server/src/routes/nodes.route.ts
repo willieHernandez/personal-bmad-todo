@@ -12,6 +12,7 @@ import {
   getProjects,
   getNodeById,
   getChildren,
+  getNodeAncestors,
   createNode,
   updateNode,
   deleteNode,
@@ -103,6 +104,25 @@ export default async function nodesRoutes(app: FastifyInstance) {
     try {
       await deleteNode(request.params.id);
       return reply.status(204).send();
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({
+          statusCode: 404,
+          error: 'Not Found',
+          message: err.message,
+        });
+      }
+      throw err;
+    }
+  });
+
+  // GET /api/nodes/:id/ancestors — get ancestor chain from root to node
+  fastify.get(`${API_ROUTES.NODES}/:id/ancestors`, {
+    schema: { params: idParamSchema },
+  }, async (request, reply) => {
+    try {
+      const ancestors = await getNodeAncestors(request.params.id);
+      return reply.send(ancestors);
     } catch (err) {
       if (err instanceof NotFoundError) {
         return reply.status(404).send({
