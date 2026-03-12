@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback } from 'react'
 import { cn } from '#/lib/utils'
 import { useNode } from '#/queries/node-queries'
 import { useDetailPanelStore } from '#/stores/detail-panel-store'
+import { MarkdownEditor } from './markdown-editor'
 
 interface DetailContentProps {
   nodeId: string
@@ -64,15 +65,12 @@ export function DetailContent({ nodeId }: DetailContentProps) {
           <span className="text-xs text-app-accent">Completed</span>
         )}
       </div>
-      {node.markdownBody ? (
-        <div className="whitespace-pre-wrap text-sm text-app-text-secondary">
-          {node.markdownBody}
-        </div>
-      ) : (
-        <p className="text-sm italic text-app-text-secondary">
-          No content yet. Markdown editor coming in Story 2.2.
-        </p>
-      )}
+      <MarkdownEditor
+        nodeId={nodeId}
+        parentId={node.parentId}
+        markdownBody={node.markdownBody}
+        nodeTitle={node.title}
+      />
     </div>
   )
 }

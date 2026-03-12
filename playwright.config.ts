@@ -1,6 +1,10 @@
+import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
+const TEST_DB_PATH = path.resolve('./test-data/e2e.db');
+
 export default defineConfig({
+  globalSetup: './tests/e2e/global-setup.ts',
   testDir: './tests/e2e',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
@@ -28,5 +32,6 @@ export default defineConfig({
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 15_000,
+    env: { ...process.env, DB_PATH: TEST_DB_PATH },
   },
 });
