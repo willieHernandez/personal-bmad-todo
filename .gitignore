@@ -5,3 +5,5 @@ dist
 .playwright-mcp/*
 *.png
 **/coverage/*
+playwright-report/*
+test-results/*
