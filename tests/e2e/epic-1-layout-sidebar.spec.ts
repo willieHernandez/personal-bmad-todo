@@ -21,8 +21,8 @@ test.describe('Epic 1 - Story 1.3: App Layout & Project Sidebar', () => {
     // Capture bar placeholder at the top
     await expect(page.locator('text=Quick capture')).toBeVisible();
 
-    // Project tabs bar
-    await expect(page.getByRole('tablist')).toBeVisible();
+    // Project tabs bar (present in DOM; visible once a project is open)
+    await expect(page.getByRole('tablist')).toBeAttached();
 
     // Sidebar navigation
     const sidebar = page.locator('nav').first();

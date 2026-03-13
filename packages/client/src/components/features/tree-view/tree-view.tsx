@@ -798,6 +798,7 @@ export function TreeView({ projectId }: TreeViewProps) {
             </p>
             <button
               type="button"
+              data-testid="empty-state-add-effort"
               className="flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-app-text-primary transition-colors hover:bg-app-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent focus-visible:ring-offset-2"
               onClick={handleCreateFirstEffort}
             >

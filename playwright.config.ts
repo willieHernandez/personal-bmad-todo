@@ -30,7 +30,7 @@ export default defineConfig({
   webServer: {
     command: 'pnpm dev',
     url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && !process.env.E2E_OWN_SERVER,
     timeout: 15_000,
     env: { ...process.env, DB_PATH: TEST_DB_PATH, DISABLE_RATE_LIMIT: '1' },
   },

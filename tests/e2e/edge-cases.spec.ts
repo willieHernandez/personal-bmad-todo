@@ -23,7 +23,7 @@ test.describe('Edge Cases', () => {
     await selectProjectInSidebar(page, 'Full Hierarchy');
 
     // Create effort via tree ("Add effort" button in empty state)
-    const createBtn = page.getByRole('button', { name: /Add effort/i });
+    const createBtn = page.getByTestId('empty-state-add-effort');
     if (await createBtn.isVisible()) {
       await createBtn.click();
       await page.waitForTimeout(300);
@@ -64,7 +64,7 @@ test.describe('Edge Cases', () => {
     await selectProjectInSidebar(page, 'Empty Project');
 
     // Should see the "Add effort" button or empty state text
-    const emptyState = page.getByRole('button', { name: /Add effort/i });
+    const emptyState = page.getByTestId('empty-state-add-effort');
     await expect(emptyState).toBeVisible();
   });
 

@@ -3,23 +3,50 @@ import { type Page, type Locator, expect } from '@playwright/test';
 const API_BASE = '/api';
 
 /**
+ * Fetch with automatic retry on 429 (rate limit) responses.
+ * Defined as a string so it can be injected into page.evaluate browser context.
+ */
+const RETRY_FETCH_BODY = `
+async function retryFetch(url, init, maxRetries = 3) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, init);
+    if (res.status === 429 && attempt < maxRetries) {
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      continue;
+    }
+    return res;
+  }
+  throw new Error('retryFetch: exhausted retries');
+}
+`;
+
+/**
  * Reset the database to a clean state by deleting all projects.
  * Calls the API directly to avoid UI overhead.
  */
 export async function resetDatabase(page: Page): Promise<void> {
-  const projects = await page.evaluate(async (base) => {
-    const res = await fetch(`${base}/nodes`);
-    return res.json();
-  }, API_BASE);
+  await page.evaluate(async (base) => {
+    async function retryFetch(url: string, init?: RequestInit, maxRetries = 3): Promise<Response> {
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const res = await fetch(url, init);
+        if (res.status === 429 && attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        return res;
+      }
+      throw new Error('retryFetch: exhausted retries');
+    }
 
-  for (const project of projects) {
-    await page.evaluate(
-      async ({ base, id }) => {
-        await fetch(`${base}/nodes/${id}`, { method: 'DELETE' });
-      },
-      { base: API_BASE, id: project.id }
-    );
-  }
+    const res = await retryFetch(`${base}/nodes`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+
+    for (const project of data) {
+      await retryFetch(`${base}/nodes/${project.id}`, { method: 'DELETE' });
+    }
+  }, API_BASE);
 }
 
 /**
@@ -31,11 +58,26 @@ export async function createProjectViaAPI(
 ): Promise<{ id: string; title: string }> {
   const result = await page.evaluate(
     async ({ base, title }) => {
-      const res = await fetch(`${base}/nodes`, {
+      async function retryFetch(url: string, init?: RequestInit, maxRetries = 5): Promise<Response> {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          const res = await fetch(url, init);
+          if (res.status === 429 && attempt < maxRetries) {
+            const retryAfter = res.headers.get('retry-after');
+            const wait = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000 * (attempt + 1);
+            await new Promise(r => setTimeout(r, wait));
+            continue;
+          }
+          return res;
+        }
+        throw new Error('retryFetch: exhausted retries');
+      }
+
+      const res = await retryFetch(`${base}/nodes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, type: 'project', parentId: null }),
       });
+      if (!res.ok) throw new Error(`createProjectViaAPI failed: ${res.status} ${await res.text()}`);
       return res.json();
     },
     { base: API_BASE, title }
@@ -55,11 +97,26 @@ export async function createNodeViaAPI(
 ): Promise<{ id: string; title: string }> {
   const result = await page.evaluate(
     async ({ base, title, type, parentId, sortOrder }) => {
-      const res = await fetch(`${base}/nodes`, {
+      async function retryFetch(url: string, init?: RequestInit, maxRetries = 5): Promise<Response> {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          const res = await fetch(url, init);
+          if (res.status === 429 && attempt < maxRetries) {
+            const retryAfter = res.headers.get('retry-after');
+            const wait = retryAfter ? parseInt(retryAfter, 10) * 1000 : 2000 * (attempt + 1);
+            await new Promise(r => setTimeout(r, wait));
+            continue;
+          }
+          return res;
+        }
+        throw new Error('retryFetch: exhausted retries');
+      }
+
+      const res = await retryFetch(`${base}/nodes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, type, parentId, sortOrder }),
       });
+      if (!res.ok) throw new Error(`createNodeViaAPI failed: ${res.status} ${await res.text()}`);
       return res.json();
     },
     { base: API_BASE, title, type, parentId, sortOrder }

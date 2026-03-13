@@ -47,8 +47,8 @@ test.describe('Epic 2 - Story 2.1: Detail Panel & Tabbed Views', () => {
     const panel = page.getByRole('complementary', { name: 'Task detail panel' });
     await expect(panel).toBeVisible();
 
-    // Panel shows the node title in the heading
-    await expect(panel.getByRole('heading', { name: 'Task Alpha' })).toBeVisible();
+    // Panel shows the node title in a tab
+    await expect(panel.getByRole('tab', { name: /Task Alpha/ })).toBeVisible();
 
     // Tree remains visible beside the panel
     await expect(getTreeItemByText(page, 'Effort One')).toBeVisible();
@@ -252,7 +252,7 @@ test.describe('Epic 2 - Story 2.1: Detail Panel & Tabbed Views', () => {
     await treeItem.dblclick();
 
     // An input for renaming should appear
-    const input = page.getByRole('textbox');
+    const input = page.getByTestId('tree-row-input');
     await expect(input).toBeVisible();
     await expect(input).toHaveValue('Task Alpha');
 

@@ -25,7 +25,7 @@ test.describe('Epic 1 - Story 1.4: Tree View & Hierarchy Creation', () => {
 
     // Should show the empty state with "Add effort" button
     await expect(page.getByText('No efforts yet')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Add effort' })).toBeVisible();
+    await expect(page.getByTestId('empty-state-add-effort')).toBeVisible();
   });
 
   test('create first effort via "Add effort" button', async ({ page }) => {
@@ -34,7 +34,7 @@ test.describe('Epic 1 - Story 1.4: Tree View & Hierarchy Creation', () => {
     await page.locator('nav').first().waitFor({ state: 'visible' });
 
     await selectProjectInSidebar(page, 'My Project');
-    await page.getByRole('button', { name: 'Add effort' }).click();
+    await page.getByTestId('empty-state-add-effort').click();
 
     // An inline input should appear
     const input = page.getByTestId('tree-row-input');
@@ -153,7 +153,7 @@ test.describe('Epic 1 - Story 1.4: Tree View & Hierarchy Creation', () => {
     await page.locator('nav').first().waitFor({ state: 'visible' });
 
     await selectProjectInSidebar(page, 'Cancel Project');
-    await page.getByRole('button', { name: 'Add effort' }).click();
+    await page.getByTestId('empty-state-add-effort').click();
 
     const input = page.getByTestId('tree-row-input');
     await expect(input).toBeVisible();
