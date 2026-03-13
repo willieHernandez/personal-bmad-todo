@@ -29,11 +29,13 @@ export function buildServer(opts?: { logger?: false }) {
     contentSecurityPolicy: false, // Disabled for SPA compatibility
   });
 
-  // Rate limiting: 100 requests per minute per IP
-  server.register(rateLimit, {
-    max: 100,
-    timeWindow: '1 minute',
-  });
+  // Rate limiting: 100 requests per minute per IP (disabled in test)
+  if (!process.env.DISABLE_RATE_LIMIT) {
+    server.register(rateLimit, {
+      max: 100,
+      timeWindow: '1 minute',
+    });
+  }
 
   // CORS: same-origin only by default
   server.register(cors, {

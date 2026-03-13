@@ -32,6 +32,6 @@ export default defineConfig({
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 15_000,
-    env: { ...process.env, DB_PATH: TEST_DB_PATH },
+    env: { ...process.env, DB_PATH: TEST_DB_PATH, DISABLE_RATE_LIMIT: '1' },
   },
 });

@@ -41,7 +41,9 @@
       "Bash(find /Users/williehernandez/my_workspace/todo-bmad-style -maxdepth 3 -name *.integration.config.ts)",
       "Bash(find /Users/williehernandez/my_workspace/todo-bmad-style -maxdepth 2 -name *coverage* -o -name *nyc* -o -name *c8*)",
       "Bash(find /Users/williehernandez/my_workspace/todo-bmad-style/packages/server/src -name *.integration.ts)",
-      "Bash(grep -r \"regex\\\\|max\\\\|min\\\\|length\" /Users/williehernandez/my_workspace/todo-bmad-style/packages/shared/src/schemas/*.ts)"
+      "Bash(grep -r \"regex\\\\|max\\\\|min\\\\|length\" /Users/williehernandez/my_workspace/todo-bmad-style/packages/shared/src/schemas/*.ts)",
+      "Bash(pnpm test:e2e --grep \"Error Handling\")",
+      "Bash(lsof -ti:3001)"
     ]
   }
 }

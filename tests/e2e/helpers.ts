@@ -83,7 +83,7 @@ export async function selectProjectInSidebar(
   page: Page,
   title: string
 ): Promise<void> {
-  await page.getByRole('button', { name: title }).click();
+  await page.getByRole('button', { name: title, exact: true }).click();
   // Wait for the tree view to appear
   await page.getByRole('tree', { name: 'Project tree' }).waitFor({ state: 'visible' });
 }
