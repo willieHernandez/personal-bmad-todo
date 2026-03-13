@@ -24,6 +24,7 @@ afterEach(() => {
 })
 
 const defaultProps = {
+  childProgress: null as { completed: number; total: number } | null,
   onToggleExpand: vi.fn(),
   onToggleComplete: vi.fn(),
   onEditChange: vi.fn(),
@@ -421,5 +422,57 @@ describe('TreeRow', () => {
     )
     const checkbox = screen.getByTestId('tree-row-checkbox')
     expect(checkbox.getAttribute('aria-label')).toBe('Mark My Task as complete')
+  })
+
+  it('shows progress indicator when childProgress is provided', () => {
+    renderWithDnd(
+      <TreeRow
+        node={makeNode()}
+        depth={0}
+        isExpanded={false}
+        hasChildren={true}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        {...defaultProps}
+        childProgress={{ completed: 2, total: 4 }}
+      />
+    )
+    expect(screen.getByTestId('progress-indicator')).toBeDefined()
+    expect(screen.getByTestId('progress-count').textContent).toBe('2/4')
+  })
+
+  it('hides progress indicator when childProgress is null', () => {
+    renderWithDnd(
+      <TreeRow
+        node={makeNode()}
+        depth={0}
+        isExpanded={false}
+        hasChildren={true}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        {...defaultProps}
+        childProgress={null}
+      />
+    )
+    expect(screen.queryByTestId('progress-indicator')).toBeNull()
+  })
+
+  it('hides progress indicator when total is 0', () => {
+    renderWithDnd(
+      <TreeRow
+        node={makeNode()}
+        depth={0}
+        isExpanded={false}
+        hasChildren={false}
+        isFocused={false}
+        isEditing={false}
+        editValue=""
+        {...defaultProps}
+        childProgress={{ completed: 0, total: 0 }}
+      />
+    )
+    expect(screen.queryByTestId('progress-indicator')).toBeNull()
   })
 })

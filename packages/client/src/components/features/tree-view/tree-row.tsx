@@ -2,13 +2,16 @@ import { forwardRef, useRef, useEffect, useCallback } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { ChevronRight, Minus, Trash2, GripVertical } from 'lucide-react'
 import { cn } from '#/lib/utils'
+import { ProgressIndicator } from './progress-indicator'
 import type { NodeResponse } from '@todo-bmad-style/shared'
+import type { ChildProgress } from '#/hooks/use-tree-data'
 
 interface TreeRowProps {
   node: NodeResponse
   depth: number
   isExpanded: boolean
   hasChildren: boolean
+  childProgress: ChildProgress | null
   isFocused: boolean
   isEditing: boolean
   isRenaming?: boolean
@@ -31,6 +34,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
     depth,
     isExpanded,
     hasChildren,
+    childProgress,
     isFocused,
     isEditing,
     isRenaming,
@@ -205,6 +209,9 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
             'ml-1 flex-1 truncate motion-safe:transition-opacity motion-safe:duration-200',
             node.isCompleted && 'line-through text-app-text-secondary'
           )}>{node.title}</span>
+          {childProgress && childProgress.total > 0 && (
+            <ProgressIndicator completed={childProgress.completed} total={childProgress.total} />
+          )}
           {onDelete && (
             <button
               type="button"
