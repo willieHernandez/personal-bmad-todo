@@ -5,11 +5,17 @@ import { getNodeChildren } from '#/api/nodes.api'
 import { useTreeState, useSetNodeExpanded } from '#/queries/tree-state-queries'
 import type { NodeResponse } from '@todo-bmad-style/shared'
 
+export interface ChildProgress {
+  completed: number
+  total: number
+}
+
 export interface FlatTreeNode {
   node: NodeResponse
   depth: number
   isExpanded: boolean
   hasChildren: boolean
+  childProgress: ChildProgress | null
 }
 
 interface UseTreeDataResult {
@@ -88,6 +94,12 @@ export function useTreeData(projectId: string | null): UseTreeDataResult {
 
     const result: FlatTreeNode[] = []
 
+    function computeChildProgress(nodeChildren: NodeResponse[] | undefined): ChildProgress | null {
+      if (!nodeChildren || nodeChildren.length === 0) return null
+      const completed = nodeChildren.filter((c) => c.isCompleted).length
+      return { completed, total: nodeChildren.length }
+    }
+
     function flatten(nodes: NodeResponse[], depth: number) {
       for (const node of nodes) {
         const expanded = !!expandedMap[node.id]
@@ -95,11 +107,15 @@ export function useTreeData(projectId: string | null): UseTreeDataResult {
         const canHaveChildren = node.type !== 'subtask'
         const hasChildren = canHaveChildren && !emptyParents.has(node.id) && (children ? children.length > 0 : true)
 
+        // Compute progress from cached children data
+        const childProgress = canHaveChildren ? computeChildProgress(children) : null
+
         result.push({
           node,
           depth,
           isExpanded: expanded && hasChildren,
           hasChildren,
+          childProgress,
         })
 
         if (expanded && children && children.length > 0) {

@@ -296,6 +296,19 @@ export async function toggleNodeCompletion(id: string) {
     await db.update(nodes).set({ isCompleted: newState, updatedAt: now }).where(eq(nodes.id, id));
     affectedNodes.push({ id, isCompleted: newState });
 
+    // Cascade down — set all descendants to the same state
+    async function cascadeDown(parentId: string) {
+      const children = await getChildren(parentId);
+      for (const child of children) {
+        if (child.isCompleted !== newState) {
+          await db.update(nodes).set({ isCompleted: newState, updatedAt: now }).where(eq(nodes.id, child.id));
+          affectedNodes.push({ id: child.id, isCompleted: newState });
+        }
+        await cascadeDown(child.id);
+      }
+    }
+    await cascadeDown(id);
+
     // Cascade up — track the last affected child so the sibling check
     // is correct at every cascade level, not just the first
     let lastAffectedChildId = id;

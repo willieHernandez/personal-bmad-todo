@@ -435,7 +435,7 @@ describe('node.service', () => {
       expect(result.affectedNodes.every((n) => !n.isCompleted)).toBe(true);
     });
 
-    it('should retain children state when parent directly reopened', async () => {
+    it('should cascade down when parent directly reopened', async () => {
       const project = await createNode({ title: 'Project', type: 'project' });
       const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
       const t1 = await createNode({ title: 'T1', type: 'task', parentId: effort.id });
@@ -445,11 +445,68 @@ describe('node.service', () => {
       await toggleNodeCompletion(t1.id);
       await toggleNodeCompletion(t2.id);
 
-      // Reopen effort directly — children should stay completed
-      await toggleNodeCompletion(effort.id);
+      // Reopen effort directly — children should also reopen (cascade down)
+      const result = await toggleNodeCompletion(effort.id);
       expect((await getNodeById(effort.id)).isCompleted).toBe(false);
+      expect((await getNodeById(t1.id)).isCompleted).toBe(false);
+      expect((await getNodeById(t2.id)).isCompleted).toBe(false);
+      // affected: effort + t1 + t2 + project (cascade up)
+      const affectedIds = result.affectedNodes.map((n) => n.id);
+      expect(affectedIds).toContain(effort.id);
+      expect(affectedIds).toContain(t1.id);
+      expect(affectedIds).toContain(t2.id);
+    });
+
+    it('should cascade down when completing a parent with incomplete children', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
+      const t1 = await createNode({ title: 'T1', type: 'task', parentId: effort.id });
+      const t2 = await createNode({ title: 'T2', type: 'task', parentId: effort.id });
+      const t3 = await createNode({ title: 'T3', type: 'task', parentId: effort.id });
+
+      // Complete effort directly — all children should cascade to complete
+      const result = await toggleNodeCompletion(effort.id);
+      expect((await getNodeById(effort.id)).isCompleted).toBe(true);
       expect((await getNodeById(t1.id)).isCompleted).toBe(true);
       expect((await getNodeById(t2.id)).isCompleted).toBe(true);
+      expect((await getNodeById(t3.id)).isCompleted).toBe(true);
+
+      const affectedIds = result.affectedNodes.map((n) => n.id);
+      expect(affectedIds).toContain(effort.id);
+      expect(affectedIds).toContain(t1.id);
+      expect(affectedIds).toContain(t2.id);
+      expect(affectedIds).toContain(t3.id);
+    });
+
+    it('should cascade down multi-level when completing a parent', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
+      const task = await createNode({ title: 'Task', type: 'task', parentId: effort.id });
+      const subtask = await createNode({ title: 'Subtask', type: 'subtask', parentId: task.id });
+
+      // Complete effort — task and subtask should all cascade down
+      await toggleNodeCompletion(effort.id);
+      expect((await getNodeById(effort.id)).isCompleted).toBe(true);
+      expect((await getNodeById(task.id)).isCompleted).toBe(true);
+      expect((await getNodeById(subtask.id)).isCompleted).toBe(true);
+    });
+
+    it('should skip already-matching children during downward cascade', async () => {
+      const project = await createNode({ title: 'Project', type: 'project' });
+      const effort = await createNode({ title: 'Effort', type: 'effort', parentId: project.id });
+      const t1 = await createNode({ title: 'T1', type: 'task', parentId: effort.id });
+      const t2 = await createNode({ title: 'T2', type: 'task', parentId: effort.id });
+
+      // Complete t1 first
+      await toggleNodeCompletion(t1.id);
+
+      // Now complete effort — t1 is already complete so only t2 should be in affectedNodes as cascade-down
+      const result = await toggleNodeCompletion(effort.id);
+      const affectedIds = result.affectedNodes.map((n) => n.id);
+      expect(affectedIds).toContain(effort.id);
+      expect(affectedIds).toContain(t2.id);
+      // t1 was already complete, should NOT be in affectedNodes
+      expect(affectedIds).not.toContain(t1.id);
     });
 
     it('should not cascade when siblings still incomplete', async () => {

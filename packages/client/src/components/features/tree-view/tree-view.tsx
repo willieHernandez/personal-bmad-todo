@@ -746,6 +746,7 @@ export function TreeView({ projectId }: TreeViewProps) {
                   depth={flatNode.depth}
                   isExpanded={flatNode.isExpanded}
                   hasChildren={flatNode.hasChildren}
+                  childProgress={flatNode.childProgress}
                   isFocused={focusedIndex === virtualRow.index}
                   isEditing={editingNodeId === flatNode.node.id}
                   isRenaming={editingNodeId === flatNode.node.id && !isNewNode}

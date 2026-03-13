@@ -43,6 +43,25 @@ const mockTasks: NodeResponse[] = [
   },
 ]
 
+const mockMixedTasks: NodeResponse[] = [
+  { id: 'mt1', title: 'Mixed Task 1', type: 'task', parentId: 'e2', sortOrder: 0, isCompleted: true, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+  { id: 'mt2', title: 'Mixed Task 2', type: 'task', parentId: 'e2', sortOrder: 1, isCompleted: false, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+  { id: 'mt3', title: 'Mixed Task 3', type: 'task', parentId: 'e2', sortOrder: 2, isCompleted: true, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+  { id: 'mt4', title: 'Mixed Task 4', type: 'task', parentId: 'e2', sortOrder: 3, isCompleted: false, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+]
+
+const mockAllCompleteTasks: NodeResponse[] = [
+  { id: 'ac1', title: 'Done 1', type: 'task', parentId: 'e2', sortOrder: 0, isCompleted: true, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+  { id: 'ac2', title: 'Done 2', type: 'task', parentId: 'e2', sortOrder: 1, isCompleted: true, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+  { id: 'ac3', title: 'Done 3', type: 'task', parentId: 'e2', sortOrder: 2, isCompleted: true, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+]
+
+const mockNoneCompleteTasks: NodeResponse[] = [
+  { id: 'nc1', title: 'Todo 1', type: 'task', parentId: 'e2', sortOrder: 0, isCompleted: false, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+  { id: 'nc2', title: 'Todo 2', type: 'task', parentId: 'e2', sortOrder: 1, isCompleted: false, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+  { id: 'nc3', title: 'Todo 3', type: 'task', parentId: 'e2', sortOrder: 2, isCompleted: false, markdownBody: '', createdAt: '2026-03-10T00:00:00Z', updatedAt: '2026-03-10T00:00:00Z' },
+]
+
 const mockSubtasks: NodeResponse[] = [
   {
     id: 's1',
@@ -69,9 +88,12 @@ vi.mock('#/queries/node-queries', () => ({
   }),
 }))
 
+let mockE2Children: NodeResponse[] = mockMixedTasks
+
 vi.mock('#/api/nodes.api', () => ({
   getNodeChildren: vi.fn((parentId: string) => {
     if (parentId === 'e1') return Promise.resolve(mockTasks)
+    if (parentId === 'e2') return Promise.resolve(mockE2Children)
     if (parentId === 't1') return Promise.resolve(mockSubtasks)
     return Promise.resolve([])
   }),
@@ -101,6 +123,7 @@ describe('useTreeData', () => {
   beforeEach(() => {
     mockTreeState = {}
     mockMutate.mockClear()
+    mockE2Children = mockMixedTasks
   })
 
   it('returns flat list of root children at depth 0', () => {
@@ -166,5 +189,107 @@ describe('useTreeData', () => {
     })
 
     expect(result.current.expandedMap).toEqual({ e1: true, e2: false })
+  })
+
+  describe('childProgress computation', () => {
+    it('returns null childProgress for efforts when not expanded (no children data in cache)', () => {
+      // e1 and e2 are not expanded, so childrenMap has no data for them
+      const { result } = renderHook(() => useTreeData('proj-1'), {
+        wrapper: createWrapper(),
+      })
+
+      expect(result.current.visibleNodes[0].childProgress).toBeNull()
+      expect(result.current.visibleNodes[1].childProgress).toBeNull()
+    })
+
+    it('returns null childProgress for subtask nodes (leaf nodes cannot have children)', () => {
+      // Subtasks have type 'subtask' so canHaveChildren = false → childProgress = null
+      mockTreeState = { e1: true, t1: true }
+
+      const { result } = renderHook(() => useTreeData('proj-1'), {
+        wrapper: createWrapper(),
+      })
+
+      // Even if subtask data were in childrenMap, subtasks should still return null progress
+      // since canHaveChildren is false for subtasks
+      const allNodes = result.current.visibleNodes
+      const subtaskNode = allNodes.find((n) => n.node.type === 'subtask')
+      if (subtaskNode) {
+        expect(subtaskNode.childProgress).toBeNull()
+      }
+    })
+
+    it('includes childProgress property on all FlatTreeNode objects', () => {
+      const { result } = renderHook(() => useTreeData('proj-1'), {
+        wrapper: createWrapper(),
+      })
+
+      // All nodes should have childProgress property (null or object)
+      for (const flatNode of result.current.visibleNodes) {
+        expect(flatNode).toHaveProperty('childProgress')
+      }
+    })
+
+    it('computes progress when children data is available in childrenMap', async () => {
+      mockTreeState = { e1: true }
+
+      const { result, rerender } = renderHook(() => useTreeData('proj-1'), {
+        wrapper: createWrapper(),
+      })
+
+      // After queries resolve, e1's childProgress should reflect its children
+      // Wait for useQueries to resolve
+      await vi.waitFor(() => {
+        rerender()
+        const e1Node = result.current.visibleNodes.find((n) => n.node.id === 'e1')
+        // mockTasks has 1 task with isCompleted: false
+        expect(e1Node?.childProgress).toEqual({ completed: 0, total: 1 })
+      })
+    })
+
+    it('computes mixed progress: 2 of 4 children completed', async () => {
+      mockE2Children = mockMixedTasks
+      mockTreeState = { e2: true }
+
+      const { result, rerender } = renderHook(() => useTreeData('proj-1'), {
+        wrapper: createWrapper(),
+      })
+
+      await vi.waitFor(() => {
+        rerender()
+        const e2Node = result.current.visibleNodes.find((n) => n.node.id === 'e2')
+        expect(e2Node?.childProgress).toEqual({ completed: 2, total: 4 })
+      })
+    })
+
+    it('computes all-complete progress: 3 of 3 children completed', async () => {
+      mockE2Children = mockAllCompleteTasks
+      mockTreeState = { e2: true }
+
+      const { result, rerender } = renderHook(() => useTreeData('proj-1'), {
+        wrapper: createWrapper(),
+      })
+
+      await vi.waitFor(() => {
+        rerender()
+        const e2Node = result.current.visibleNodes.find((n) => n.node.id === 'e2')
+        expect(e2Node?.childProgress).toEqual({ completed: 3, total: 3 })
+      })
+    })
+
+    it('computes none-complete progress: 0 of 3 children completed', async () => {
+      mockE2Children = mockNoneCompleteTasks
+      mockTreeState = { e2: true }
+
+      const { result, rerender } = renderHook(() => useTreeData('proj-1'), {
+        wrapper: createWrapper(),
+      })
+
+      await vi.waitFor(() => {
+        rerender()
+        const e2Node = result.current.visibleNodes.find((n) => n.node.id === 'e2')
+        expect(e2Node?.childProgress).toEqual({ completed: 0, total: 3 })
+      })
+    })
   })
 })

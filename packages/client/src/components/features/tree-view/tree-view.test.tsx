@@ -36,6 +36,7 @@ const mockVisibleNodes = mockEfforts.map((node) => ({
   depth: 0,
   isExpanded: false,
   hasChildren: true,
+  childProgress: null as { completed: number; total: number } | null,
 }))
 
 const mockCreateSibling = vi.fn()
@@ -195,5 +196,29 @@ describe('TreeView', () => {
     fireEvent.click(expandButtons[0])
 
     expect(mockToggleExpand).toHaveBeenCalledWith('e1')
+  })
+
+  it('renders progress indicators when childProgress is provided', () => {
+    mockVisibleNodes[0].childProgress = { completed: 2, total: 5 }
+    mockVisibleNodes[1].childProgress = null
+
+    render(<TreeView projectId="proj-1" />, { wrapper: createWrapper() })
+
+    // First effort should show progress
+    const indicators = screen.getAllByTestId('progress-indicator')
+    expect(indicators).toHaveLength(1)
+    expect(screen.getByTestId('progress-count').textContent).toBe('2/5')
+
+    // Reset
+    mockVisibleNodes[0].childProgress = null
+  })
+
+  it('hides progress indicators when childProgress is null', () => {
+    mockVisibleNodes[0].childProgress = null
+    mockVisibleNodes[1].childProgress = null
+
+    render(<TreeView projectId="proj-1" />, { wrapper: createWrapper() })
+
+    expect(screen.queryByTestId('progress-indicator')).toBeNull()
   })
 })
