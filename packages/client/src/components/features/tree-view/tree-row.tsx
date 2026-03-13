@@ -3,8 +3,15 @@ import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { ChevronRight, Minus, Trash2, GripVertical } from 'lucide-react'
 import { cn } from '#/lib/utils'
 import { ProgressIndicator } from './progress-indicator'
-import type { NodeResponse } from '@todo-bmad-style/shared'
+import type { NodeResponse, NodeType } from '@todo-bmad-style/shared'
 import type { ChildProgress } from '#/hooks/use-tree-data'
+
+const NODE_TYPE_STYLES: Record<NodeType, string> = {
+  project: 'text-base font-semibold',
+  effort: 'text-base font-semibold',
+  task: 'text-sm font-medium',
+  subtask: 'text-xs font-normal',
+}
 
 interface TreeRowProps {
   node: NodeResponse
@@ -200,13 +207,14 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(function TreeRow
           onChange={(e) => onEditChange(e.target.value)}
           onKeyDown={handleInputKeyDown}
           onBlur={handleBlur}
-          className="ml-1 flex-1 border-none bg-transparent text-sm text-app-text-primary outline-none"
+          className={cn('ml-1 flex-1 border-none bg-transparent text-app-text-primary outline-none', NODE_TYPE_STYLES[node.type])}
           data-testid="tree-row-input"
         />
       ) : (
         <>
           <span className={cn(
             'ml-1 flex-1 truncate motion-safe:transition-opacity motion-safe:duration-200',
+            NODE_TYPE_STYLES[node.type],
             node.isCompleted && 'line-through text-app-text-secondary'
           )}>{node.title}</span>
           {childProgress && childProgress.total > 0 && (

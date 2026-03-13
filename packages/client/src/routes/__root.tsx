@@ -11,6 +11,7 @@ import { ProjectTabs } from '#/components/features/project-tabs/project-tabs'
 import { Sidebar } from '#/components/features/sidebar/sidebar'
 import { ContentPanel } from '#/components/features/content-panel/content-panel'
 import { useSidebarStore } from '#/stores/sidebar-store'
+import { ErrorBoundary } from '#/components/error-boundary'
 
 import '../styles.css'
 
@@ -40,28 +41,30 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen flex-col overflow-hidden">
-        <CaptureBarPlaceholder />
-        <ProjectTabs />
-        <div className="flex-1 overflow-hidden" ref={panelGroupRef}>
-          <ResizablePanelGroup orientation="horizontal">
-            <ResizablePanel
-              id="sidebar"
-              defaultSize={20}
-              minSize="180px"
-              maxSize="400px"
-              onResize={handleSidebarResize}
-            >
-              <Sidebar />
-            </ResizablePanel>
-            <ResizableHandle />
-            <ResizablePanel id="content" defaultSize={80}>
-              <ContentPanel />
-              <Outlet />
-            </ResizablePanel>
-          </ResizablePanelGroup>
+      <ErrorBoundary>
+        <div className="flex h-screen flex-col overflow-hidden">
+          <CaptureBarPlaceholder />
+          <ProjectTabs />
+          <div className="flex-1 overflow-hidden" ref={panelGroupRef}>
+            <ResizablePanelGroup orientation="horizontal">
+              <ResizablePanel
+                id="sidebar"
+                defaultSize={20}
+                minSize="180px"
+                maxSize="400px"
+                onResize={handleSidebarResize}
+              >
+                <Sidebar />
+              </ResizablePanel>
+              <ResizableHandle />
+              <ResizablePanel id="content" defaultSize={80}>
+                <ContentPanel />
+                <Outlet />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </div>
         </div>
-      </div>
+      </ErrorBoundary>
     </QueryClientProvider>
   )
 }

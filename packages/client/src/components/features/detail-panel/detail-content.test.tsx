@@ -46,6 +46,11 @@ vi.mock('#/queries/node-queries', () => ({
     isLoading: false,
     error: null,
   }),
+  useNodeChildren: () => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  }),
   useNodeAncestors: (nodeId: string) => ({
     data: mockAncestors[nodeId] ?? undefined,
     isLoading: false,

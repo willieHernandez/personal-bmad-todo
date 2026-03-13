@@ -509,6 +509,65 @@ export function TreeView({ projectId }: TreeViewProps) {
       // When in edit mode, don't handle navigation keys
       if (editingNodeId) return
 
+      // Handle Cmd/Ctrl+Arrow for reorder and indent/outdent
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault()
+        if (!nodeId) return
+
+        if (e.key === 'ArrowLeft') {
+          pendingFocusNodeId.current = nodeId
+          outdentNode(nodeId, visibleNodes)
+          return
+        }
+
+        if (e.key === 'ArrowRight') {
+          pendingFocusNodeId.current = nodeId
+          const newParentId = await indentNode(nodeId, visibleNodes)
+          if (newParentId) {
+            setExpanded(newParentId, true)
+          }
+          return
+        }
+
+        // Cmd+Up/Down: reorder within same parent
+        const currentIdx = visibleNodes.findIndex((n) => n.node.id === nodeId)
+        if (currentIdx < 0) return
+
+        const currentNode = visibleNodes[currentIdx]
+        const parentId = currentNode.node.parentId
+        const currentDepth = currentNode.depth
+
+        // Find adjacent sibling in the desired direction
+        let siblingNode: FlatTreeNode | null = null
+        if (e.key === 'ArrowUp') {
+          for (let i = currentIdx - 1; i >= 0; i--) {
+            if (visibleNodes[i].depth < currentDepth) break
+            if (visibleNodes[i].depth === currentDepth && visibleNodes[i].node.parentId === parentId) {
+              siblingNode = visibleNodes[i]
+              break
+            }
+          }
+        } else {
+          for (let i = currentIdx + 1; i < visibleNodes.length; i++) {
+            if (visibleNodes[i].depth < currentDepth) break
+            if (visibleNodes[i].depth === currentDepth && visibleNodes[i].node.parentId === parentId) {
+              siblingNode = visibleNodes[i]
+              break
+            }
+          }
+        }
+
+        if (!siblingNode) return
+
+        pendingFocusNodeId.current = nodeId
+        reorderNodeMutation.mutate({
+          id: currentNode.node.id,
+          parentId: parentId,
+          sortOrder: siblingNode.node.sortOrder,
+        })
+        return
+      }
+
       // Handle Tab/Shift+Tab for indent/outdent
       if (e.key === 'Tab') {
         e.preventDefault()
@@ -594,6 +653,7 @@ export function TreeView({ projectId }: TreeViewProps) {
       setExpanded,
       navHandleKeyDown,
       deleteNodeMutation,
+      reorderNodeMutation,
     ]
   )
 

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react'
-import { useNode } from '#/queries/node-queries'
+import { useNode, useNodeChildren } from '#/queries/node-queries'
 import { useDetailPanelStore } from '#/stores/detail-panel-store'
+import { cn } from '#/lib/utils'
 import { MarkdownEditor } from './markdown-editor'
 import { BreadcrumbNav } from './breadcrumb-nav'
 
@@ -10,6 +11,9 @@ interface DetailContentProps {
 
 export function DetailContent({ nodeId }: DetailContentProps) {
   const { data: node } = useNode(nodeId)
+  const showChildren = node?.type === 'effort' || node?.type === 'task'
+  const { data: children } = useNodeChildren(showChildren ? nodeId : null)
+  const openTab = useDetailPanelStore((s) => s.openTab)
   const scrollPositions = useDetailPanelStore((s) => s.scrollPositions)
   const saveScrollPosition = useDetailPanelStore((s) => s.saveScrollPosition)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -47,6 +51,26 @@ export function DetailContent({ nodeId }: DetailContentProps) {
       {node.isCompleted && (
         <div className="mb-2 text-sm text-app-text-secondary line-through motion-safe:transition-opacity motion-safe:duration-200" data-testid="detail-completed-indicator">
           {node.title} — Completed
+        </div>
+      )}
+      {showChildren && children && children.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5" data-testid="detail-children-list">
+          {children.map((child) => (
+            <button
+              key={child.id}
+              type="button"
+              className={cn(
+                'rounded-md border border-app-border bg-app-surface px-2 py-0.5 text-xs text-app-text-secondary transition-colors hover:bg-app-hover hover:text-app-text-primary',
+                child.isCompleted && 'line-through'
+              )}
+              onClick={() => openTab(child.id)}
+              title={child.title}
+              aria-label={`Open child node: ${child.title}`}
+              data-testid="detail-child-chip"
+            >
+              <span className="max-w-[150px] truncate inline-block align-bottom">{child.title}</span>
+            </button>
+          ))}
         </div>
       )}
       <MarkdownEditor
