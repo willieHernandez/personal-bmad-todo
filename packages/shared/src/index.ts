@@ -1,5 +1,5 @@
 // Constants
-export { MAX_DEPTH, NodeType } from './constants/hierarchy.js';
+export { MAX_DEPTH, NodeType, VALID_CHILD_TYPES } from './constants/hierarchy.js';
 export { API_PREFIX, API_ROUTES } from './constants/api.js';
 
 // Schemas

@@ -3,7 +3,8 @@ import { useNodeChildren } from '#/queries/node-queries'
 import { useQueries } from '@tanstack/react-query'
 import { getNodeChildren } from '#/api/nodes.api'
 import { useTreeState, useSetNodeExpanded } from '#/queries/tree-state-queries'
-import type { NodeResponse } from '@todo-bmad-style/shared'
+import { VALID_CHILD_TYPES } from '@todo-bmad-style/shared'
+import type { NodeResponse, NodeType } from '@todo-bmad-style/shared'
 
 export interface ChildProgress {
   completed: number
@@ -11,6 +12,7 @@ export interface ChildProgress {
 }
 
 export interface FlatTreeNode {
+  kind: 'node'
   node: NodeResponse
   depth: number
   isExpanded: boolean
@@ -18,8 +20,17 @@ export interface FlatTreeNode {
   childProgress: ChildProgress | null
 }
 
+export interface AddButtonRow {
+  kind: 'add-button'
+  parentId: string
+  childType: NodeType
+  depth: number
+}
+
+export type TreeRow = FlatTreeNode | AddButtonRow
+
 interface UseTreeDataResult {
-  visibleNodes: FlatTreeNode[]
+  visibleNodes: TreeRow[]
   expandedMap: Record<string, boolean>
   toggleExpand: (nodeId: string) => void
   isExpanded: (nodeId: string) => boolean
@@ -92,7 +103,7 @@ export function useTreeData(projectId: string | null): UseTreeDataResult {
   const visibleNodes = useMemo(() => {
     if (!rootChildren) return []
 
-    const result: FlatTreeNode[] = []
+    const result: TreeRow[] = []
 
     function computeChildProgress(nodeChildren: NodeResponse[] | undefined): ChildProgress | null {
       if (!nodeChildren || nodeChildren.length === 0) return null
@@ -111,6 +122,7 @@ export function useTreeData(projectId: string | null): UseTreeDataResult {
         const childProgress = canHaveChildren ? computeChildProgress(children) : null
 
         result.push({
+          kind: 'node',
           node,
           depth,
           isExpanded: expanded && hasChildren,
@@ -120,13 +132,30 @@ export function useTreeData(projectId: string | null): UseTreeDataResult {
 
         if (expanded && children && children.length > 0) {
           flatten(children, depth + 1)
+          // Path A: add button after last child of expanded node
+          const childType = VALID_CHILD_TYPES[node.type]
+          if (childType) {
+            result.push({ kind: 'add-button', parentId: node.id, childType, depth: depth + 1 })
+          }
+        } else if (expanded && canHaveChildren && emptyParents.has(node.id)) {
+          // Path B: add button for expanded empty parent
+          const childType = VALID_CHILD_TYPES[node.type]
+          if (childType) {
+            result.push({ kind: 'add-button', parentId: node.id, childType, depth: depth + 1 })
+          }
         }
       }
     }
 
     flatten(rootChildren, 0)
+
+    // Root level: add button for adding efforts to the project
+    if (projectId) {
+      result.push({ kind: 'add-button', parentId: projectId, childType: 'effort' as NodeType, depth: 0 })
+    }
+
     return result
-  }, [rootChildren, expandedMap, childrenMap, emptyParents])
+  }, [rootChildren, expandedMap, childrenMap, emptyParents, projectId])
 
   return { visibleNodes, expandedMap, toggleExpand, isExpanded, setExpanded }
 }

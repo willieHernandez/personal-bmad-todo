@@ -23,10 +23,12 @@ function makeFlatNode(
   opts: { isExpanded?: boolean; hasChildren?: boolean; type?: 'project' | 'effort' | 'task' | 'subtask'; parentId?: string | null } = {}
 ): FlatTreeNode {
   return {
+    kind: 'node' as const,
     node: makeNode({ id, type: opts.type ?? 'effort', parentId: opts.parentId ?? null }),
     depth,
     isExpanded: opts.isExpanded ?? false,
     hasChildren: opts.hasChildren ?? false,
+    childProgress: null,
   }
 }
 

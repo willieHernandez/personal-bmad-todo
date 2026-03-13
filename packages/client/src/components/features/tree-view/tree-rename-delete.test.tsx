@@ -44,10 +44,12 @@ const mockEfforts: NodeResponse[] = [
 ]
 
 const mockVisibleNodes = mockEfforts.map((node) => ({
+  kind: 'node' as const,
   node,
   depth: 0,
   isExpanded: false,
   hasChildren: true,
+  childProgress: null,
 }))
 
 const mockCreateSibling = vi.fn()
@@ -94,6 +96,10 @@ vi.mock('#/queries/node-queries', () => ({
   }),
   useToggleNodeCompletion: () => ({
     mutate: vi.fn(),
+  }),
+  useCreateNode: () => ({
+    mutate: vi.fn(),
+    isPending: false,
   }),
 }))
 
@@ -373,6 +379,7 @@ describe('getDeleteFocusTarget', () => {
     depth: number
   ): FlatTreeNode {
     return {
+      kind: 'node' as const,
       node: {
         id,
         title: `Node ${id}`,
@@ -387,6 +394,7 @@ describe('getDeleteFocusTarget', () => {
       depth,
       isExpanded: false,
       hasChildren: false,
+      childProgress: null,
     }
   }
 

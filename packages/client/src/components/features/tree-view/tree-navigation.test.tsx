@@ -53,20 +53,24 @@ let testExpandedMap: Record<string, boolean> = {}
 
 function getVisibleNodes() {
   const nodes = mockEfforts.map((node) => ({
+    kind: 'node' as const,
     node,
     depth: 0,
     isExpanded: !!testExpandedMap[node.id],
     hasChildren: true,
+    childProgress: null,
   }))
 
   // If e1 is expanded, include its children
   if (testExpandedMap['e1']) {
     const e1Index = nodes.findIndex((n) => n.node.id === 'e1')
     const taskNodes = mockTasks.map((node) => ({
+      kind: 'node' as const,
       node,
       depth: 1,
       isExpanded: false,
       hasChildren: false,
+      childProgress: null,
     }))
     nodes.splice(e1Index + 1, 0, ...taskNodes)
   }

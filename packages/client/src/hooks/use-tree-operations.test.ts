@@ -53,7 +53,7 @@ function makeFlatNode(
   isExpanded = false,
   hasChildren = true
 ) {
-  return { node, depth, isExpanded, hasChildren }
+  return { kind: 'node' as const, node, depth, isExpanded, hasChildren, childProgress: null }
 }
 
 describe('useTreeOperations', () => {

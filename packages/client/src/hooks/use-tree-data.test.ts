@@ -110,6 +110,11 @@ vi.mock('#/queries/tree-state-queries', () => ({
 }))
 
 import { useTreeData } from './use-tree-data'
+import type { FlatTreeNode } from './use-tree-data'
+
+function isNodeRow(row: { kind?: string }): row is FlatTreeNode {
+  return row.kind === 'node'
+}
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -131,11 +136,12 @@ describe('useTreeData', () => {
       wrapper: createWrapper(),
     })
 
-    expect(result.current.visibleNodes).toHaveLength(2)
-    expect(result.current.visibleNodes[0].node.id).toBe('e1')
-    expect(result.current.visibleNodes[0].depth).toBe(0)
-    expect(result.current.visibleNodes[1].node.id).toBe('e2')
-    expect(result.current.visibleNodes[1].depth).toBe(0)
+    const nodeRows = result.current.visibleNodes.filter(isNodeRow)
+    expect(nodeRows).toHaveLength(2)
+    expect(nodeRows[0].node.id).toBe('e1')
+    expect(nodeRows[0].depth).toBe(0)
+    expect(nodeRows[1].node.id).toBe('e2')
+    expect(nodeRows[1].depth).toBe(0)
   })
 
   it('marks efforts as having children and subtasks as not', () => {
@@ -144,7 +150,8 @@ describe('useTreeData', () => {
     })
 
     // Efforts can have children
-    expect(result.current.visibleNodes[0].hasChildren).toBe(true)
+    const nodeRows = result.current.visibleNodes.filter(isNodeRow)
+    expect(nodeRows[0].hasChildren).toBe(true)
   })
 
   it('toggleExpand calls mutation with toggled value', () => {
@@ -177,7 +184,7 @@ describe('useTreeData', () => {
     })
 
     // e1 should be expanded, and its children (from useQueries mock) should appear
-    const e1Node = result.current.visibleNodes.find((n) => n.node.id === 'e1')
+    const e1Node = result.current.visibleNodes.filter(isNodeRow).find((n) => n.node.id === 'e1')
     expect(e1Node?.isExpanded).toBe(true)
   })
 
@@ -198,8 +205,9 @@ describe('useTreeData', () => {
         wrapper: createWrapper(),
       })
 
-      expect(result.current.visibleNodes[0].childProgress).toBeNull()
-      expect(result.current.visibleNodes[1].childProgress).toBeNull()
+      const nodeRows = result.current.visibleNodes.filter(isNodeRow)
+      expect(nodeRows[0].childProgress).toBeNull()
+      expect(nodeRows[1].childProgress).toBeNull()
     })
 
     it('returns null childProgress for subtask nodes (leaf nodes cannot have children)', () => {
@@ -212,7 +220,7 @@ describe('useTreeData', () => {
 
       // Even if subtask data were in childrenMap, subtasks should still return null progress
       // since canHaveChildren is false for subtasks
-      const allNodes = result.current.visibleNodes
+      const allNodes = result.current.visibleNodes.filter(isNodeRow)
       const subtaskNode = allNodes.find((n) => n.node.type === 'subtask')
       if (subtaskNode) {
         expect(subtaskNode.childProgress).toBeNull()
@@ -225,7 +233,7 @@ describe('useTreeData', () => {
       })
 
       // All nodes should have childProgress property (null or object)
-      for (const flatNode of result.current.visibleNodes) {
+      for (const flatNode of result.current.visibleNodes.filter(isNodeRow)) {
         expect(flatNode).toHaveProperty('childProgress')
       }
     })
@@ -241,7 +249,7 @@ describe('useTreeData', () => {
       // Wait for useQueries to resolve
       await vi.waitFor(() => {
         rerender()
-        const e1Node = result.current.visibleNodes.find((n) => n.node.id === 'e1')
+        const e1Node = result.current.visibleNodes.filter(isNodeRow).find((n) => n.node.id === 'e1')
         // mockTasks has 1 task with isCompleted: false
         expect(e1Node?.childProgress).toEqual({ completed: 0, total: 1 })
       })
@@ -257,7 +265,7 @@ describe('useTreeData', () => {
 
       await vi.waitFor(() => {
         rerender()
-        const e2Node = result.current.visibleNodes.find((n) => n.node.id === 'e2')
+        const e2Node = result.current.visibleNodes.filter(isNodeRow).find((n) => n.node.id === 'e2')
         expect(e2Node?.childProgress).toEqual({ completed: 2, total: 4 })
       })
     })
@@ -272,7 +280,7 @@ describe('useTreeData', () => {
 
       await vi.waitFor(() => {
         rerender()
-        const e2Node = result.current.visibleNodes.find((n) => n.node.id === 'e2')
+        const e2Node = result.current.visibleNodes.filter(isNodeRow).find((n) => n.node.id === 'e2')
         expect(e2Node?.childProgress).toEqual({ completed: 3, total: 3 })
       })
     })
@@ -287,7 +295,7 @@ describe('useTreeData', () => {
 
       await vi.waitFor(() => {
         rerender()
-        const e2Node = result.current.visibleNodes.find((n) => n.node.id === 'e2')
+        const e2Node = result.current.visibleNodes.filter(isNodeRow).find((n) => n.node.id === 'e2')
         expect(e2Node?.childProgress).toEqual({ completed: 0, total: 3 })
       })
     })

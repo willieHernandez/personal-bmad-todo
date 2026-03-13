@@ -32,6 +32,7 @@ const mockEfforts: NodeResponse[] = [
 ]
 
 const mockVisibleNodes = mockEfforts.map((node) => ({
+  kind: 'node' as const,
   node,
   depth: 0,
   isExpanded: false,
@@ -88,6 +89,10 @@ vi.mock('#/queries/node-queries', () => ({
   }),
   useToggleNodeCompletion: () => ({
     mutate: mockToggleCompletionMutate,
+  }),
+  useCreateNode: () => ({
+    mutate: vi.fn(),
+    isPending: false,
   }),
 }))
 

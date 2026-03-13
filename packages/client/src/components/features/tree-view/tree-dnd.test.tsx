@@ -25,10 +25,12 @@ function makeNode(overrides: Partial<NodeResponse> = {}): NodeResponse {
 
 function makeFlatNode(nodeOverrides: Partial<NodeResponse> = {}, flatOverrides: Partial<Omit<FlatTreeNode, 'node'>> = {}): FlatTreeNode {
   return {
+    kind: 'node',
     node: makeNode(nodeOverrides),
     depth: 0,
     isExpanded: false,
     hasChildren: false,
+    childProgress: null,
     ...flatOverrides,
   }
 }
@@ -43,18 +45,20 @@ const subtask1 = makeNode({ id: 's1', title: 'Subtask One', type: 'subtask', par
 const mockEfforts: NodeResponse[] = [effort1, effort2]
 
 const mockVisibleNodesSimple = mockEfforts.map((node) => ({
+  kind: 'node' as const,
   node,
   depth: 0,
   isExpanded: false,
   hasChildren: true,
+  childProgress: null,
 }))
 
 const mockVisibleNodesComplex: FlatTreeNode[] = [
-  { node: effort1, depth: 0, isExpanded: true, hasChildren: true },
-  { node: task1, depth: 1, isExpanded: true, hasChildren: true },
-  { node: subtask1, depth: 2, isExpanded: false, hasChildren: false },
-  { node: task2, depth: 1, isExpanded: false, hasChildren: false },
-  { node: effort2, depth: 0, isExpanded: false, hasChildren: true },
+  { kind: 'node', node: effort1, depth: 0, isExpanded: true, hasChildren: true, childProgress: null },
+  { kind: 'node', node: task1, depth: 1, isExpanded: true, hasChildren: true, childProgress: null },
+  { kind: 'node', node: subtask1, depth: 2, isExpanded: false, hasChildren: false, childProgress: null },
+  { kind: 'node', node: task2, depth: 1, isExpanded: false, hasChildren: false, childProgress: null },
+  { kind: 'node', node: effort2, depth: 0, isExpanded: false, hasChildren: true, childProgress: null },
 ]
 
 const mockCreateSibling = vi.fn()
@@ -96,6 +100,7 @@ vi.mock('#/queries/node-queries', () => ({
   useReorderNode: () => ({ mutate: mockReorderMutate }),
   useMoveNode: () => ({ mutate: mockMoveMutate }),
   useToggleNodeCompletion: () => ({ mutate: vi.fn() }),
+  useCreateNode: () => ({ mutate: vi.fn(), isPending: false }),
 }))
 
 vi.mock('@tanstack/react-virtual', () => ({

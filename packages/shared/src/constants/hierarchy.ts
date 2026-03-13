@@ -8,3 +8,9 @@ export const NodeType = {
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
+
+export const VALID_CHILD_TYPES: Partial<Record<string, NodeType>> = {
+  project: 'effort',
+  effort: 'task',
+  task: 'subtask',
+};
