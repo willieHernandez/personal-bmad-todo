@@ -80,10 +80,8 @@ describe('ProjectTabs', () => {
 
     renderWithProviders(<ProjectTabs />)
 
-    // Each tab is a div[role="tab"] containing a button for the title
     const tabs = screen.getAllByRole('tab')
-    const secondTabButton = tabs[1].querySelector('button')!
-    fireEvent.click(secondTabButton)
+    fireEvent.click(tabs[1])
     expect(useUIStore.getState().activeProjectId).toBe('p2')
   })
 

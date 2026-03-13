@@ -30,7 +30,18 @@
       "Bash(npx vitest:*)",
       "Bash(pnpm test:*)",
       "Bash(ls -la /Users/williehernandez/my_workspace/todo-bmad-style/tests/e2e/*.spec.ts)",
-      "Bash(npx playwright:*)"
+      "Bash(npx playwright:*)",
+      "Bash(ls /Users/williehernandez/my_workspace/todo-bmad-style/packages/client/src/*.tsx)",
+      "Bash(pnpm tsc --noEmit -p packages/client/tsconfig.json)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(pnpm test:unit:coverage)",
+      "Bash(pnpm --filter server test:integration -- --coverage)",
+      "Bash(find /Users/williehernandez/my_workspace/todo-bmad-style -maxdepth 3 -name vitest.config* -o -name playwright.config* -o -name .nycrc* -o -name c8.config*)",
+      "Bash(find /Users/williehernandez/my_workspace/todo-bmad-style -maxdepth 3 -name *.integration.config.ts)",
+      "Bash(find /Users/williehernandez/my_workspace/todo-bmad-style -maxdepth 2 -name *coverage* -o -name *nyc* -o -name *c8*)",
+      "Bash(find /Users/williehernandez/my_workspace/todo-bmad-style/packages/server/src -name *.integration.ts)",
+      "Bash(grep -r \"regex\\\\|max\\\\|min\\\\|length\" /Users/williehernandez/my_workspace/todo-bmad-style/packages/shared/src/schemas/*.ts)"
     ]
   }
 }

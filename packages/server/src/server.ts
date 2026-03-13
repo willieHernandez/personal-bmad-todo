@@ -1,4 +1,7 @@
 import fastify from 'fastify';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import cors from '@fastify/cors';
 import {
   serializerCompiler,
   validatorCompiler,
@@ -15,10 +18,27 @@ export function buildServer(opts?: { logger?: false }) {
         target: 'pino-pretty',
       },
     },
+    bodyLimit: 1_048_576, // 1MB
   });
 
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
+
+  // Security headers
+  server.register(helmet, {
+    contentSecurityPolicy: false, // Disabled for SPA compatibility
+  });
+
+  // Rate limiting: 100 requests per minute per IP
+  server.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+  });
+
+  // CORS: same-origin only by default
+  server.register(cors, {
+    origin: false,
+  });
 
   server.get('/api/health', async (_request, reply) => {
     try {
