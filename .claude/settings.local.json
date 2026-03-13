@@ -26,7 +26,11 @@
       "Bash(curl -s http://localhost:3001/api/tree-state | python3 -m json.tool)",
       "Bash(pnpm --filter client test -- --run src/queries/node-queries.test.ts 2>&1)",
       "Bash(pnpm --filter @todo-bmad-style/client exec tsc --noEmit 2>&1 | head -20)",
-      "Bash(npx playwright test)"
+      "Bash(npx playwright test)",
+      "Bash(npx vitest:*)",
+      "Bash(pnpm test:*)",
+      "Bash(ls -la /Users/williehernandez/my_workspace/todo-bmad-style/tests/e2e/*.spec.ts)",
+      "Bash(npx playwright:*)"
     ]
   }
 }
