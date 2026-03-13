@@ -41,44 +41,46 @@ export function ProjectTabs() {
   return (
     <div className="flex h-9 shrink-0 items-center border-b border-app-border bg-app-surface">
       <ScrollArea className="w-full">
-        <div className="flex h-9 items-center" role="tablist">
-          {openProjectIds.map((id) => {
-            const project = projectMap.get(id)
-            const isActive = id === activeProjectId
-            return (
-              <div
-                key={id}
-                className={`group relative flex h-9 shrink-0 items-center text-sm transition-colors ${
-                  isActive
-                    ? 'font-medium text-app-text-primary'
-                    : 'text-app-text-secondary hover:bg-app-hover'
-                }`}
-                role="tab"
-                aria-selected={isActive}
-              >
-                <button
-                  type="button"
-                  className="flex h-full items-center gap-1.5 px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent focus-visible:ring-offset-2"
-                  onClick={() => setActiveProject(id)}
+        <div className="flex h-9 items-center">
+          <div role="tablist" aria-label="Open projects" className="flex h-9 items-center">
+            {openProjectIds.map((id) => {
+              const project = projectMap.get(id)
+              const isActive = id === activeProjectId
+              return (
+                <div
+                  key={id}
+                  className={`group relative flex h-9 shrink-0 items-center text-sm transition-colors ${
+                    isActive
+                      ? 'font-medium text-app-text-primary'
+                      : 'text-app-text-secondary hover:bg-app-hover'
+                  }`}
                 >
-                  <span className="max-w-32 truncate">
-                    {project?.title ?? 'Loading...'}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className="mr-1 rounded p-0.5 opacity-0 transition-opacity hover:bg-app-border group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent focus-visible:ring-offset-1"
-                  onClick={() => closeProjectTab(id)}
-                  aria-label={`Close ${project?.title ?? 'project'} tab`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-                {isActive && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-app-accent" />
-                )}
-              </div>
-            )
-          })}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    className="flex h-full items-center gap-1.5 px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent focus-visible:ring-offset-2"
+                    onClick={() => setActiveProject(id)}
+                  >
+                    <span className="max-w-32 truncate">
+                      {project?.title ?? 'Loading...'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="mr-1 rounded p-0.5 opacity-0 transition-opacity hover:bg-app-border group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent focus-visible:ring-offset-1"
+                    onClick={() => closeProjectTab(id)}
+                    aria-label={`Close ${project?.title ?? 'project'} tab`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  {isActive && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-app-accent" />
+                  )}
+                </div>
+              )
+            })}
+          </div>
 
           {isCreating ? (
             <input

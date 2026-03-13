@@ -58,8 +58,10 @@ function RootComponent() {
               </ResizablePanel>
               <ResizableHandle />
               <ResizablePanel id="content" defaultSize={80}>
-                <ContentPanel />
-                <Outlet />
+                <main className="h-full">
+                  <ContentPanel />
+                  <Outlet />
+                </main>
               </ResizablePanel>
             </ResizablePanelGroup>
           </div>
