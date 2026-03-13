@@ -62,9 +62,7 @@ test.describe('Epic 3 - Story 3.1 & 3.2: Completion Toggle, Cascade & Progress I
       await expect(titleSpan).toHaveCount(0);
     });
 
-    test('completing a parent does not cascade down — children stay unchecked', async ({ page }) => {
-      // The cascade is upward-only: completing all children auto-completes the parent.
-      // Completing a parent directly does NOT cascade down to children.
+    test('completing a parent cascades down to children', async ({ page }) => {
       const project = await createProjectViaAPI(page, 'Cascade Project');
       const effort = await createNodeViaAPI(page, 'Parent Effort', 'effort', project.id);
       await createNodeViaAPI(page, 'Task A', 'task', effort.id, 0);
@@ -88,11 +86,40 @@ test.describe('Epic 3 - Story 3.1 & 3.2: Completion Toggle, Cascade & Progress I
       await parentCheckbox.click();
       await expect(parentCheckbox).toBeChecked();
 
-      // Children should remain unchecked — no downward cascade
+      // Children should cascade to completed
       const taskACheckbox = getTreeItemByText(page, 'Task A').getByTestId('tree-row-checkbox');
       const taskBCheckbox = getTreeItemByText(page, 'Task B').getByTestId('tree-row-checkbox');
-      await expect(taskACheckbox).not.toBeChecked();
-      await expect(taskBCheckbox).not.toBeChecked();
+      await expect(taskACheckbox).toBeChecked({ timeout: 10000 });
+      await expect(taskBCheckbox).toBeChecked({ timeout: 10000 });
+    });
+
+    test('reopening a parent cascades down to reopen children', async ({ page }) => {
+      const project = await createProjectViaAPI(page, 'Reopen Cascade');
+      const effort = await createNodeViaAPI(page, 'Effort', 'effort', project.id);
+      await createNodeViaAPI(page, 'Task A', 'task', effort.id, 0);
+      await createNodeViaAPI(page, 'Task B', 'task', effort.id, 1);
+
+      await page.reload();
+      await page.locator('nav').first().waitFor({ state: 'visible' });
+      await selectProjectInSidebar(page, 'Reopen Cascade');
+
+      await waitForTreeItem(page, 'Effort');
+
+      // Expand
+      await getTreeItemByText(page, 'Effort')
+        .getByRole('button', { name: /Expand|Collapse/ })
+        .click();
+      await waitForTreeItem(page, 'Task A');
+
+      // Complete parent (cascades down)
+      const effortCheckbox = getTreeItemByText(page, 'Effort').getByTestId('tree-row-checkbox');
+      await effortCheckbox.click();
+      await expect(getTreeItemByText(page, 'Task A').getByTestId('tree-row-checkbox')).toBeChecked({ timeout: 10000 });
+
+      // Reopen parent (should cascade down — children reopen too)
+      await effortCheckbox.click();
+      await expect(getTreeItemByText(page, 'Task A').getByTestId('tree-row-checkbox')).not.toBeChecked({ timeout: 10000 });
+      await expect(getTreeItemByText(page, 'Task B').getByTestId('tree-row-checkbox')).not.toBeChecked({ timeout: 10000 });
     });
 
     test('completing all children cascades up to parent', async ({ page }) => {
